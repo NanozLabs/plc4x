@@ -48,6 +48,7 @@ public abstract class ModbusTag implements PlcTag, Serializable {
     private final ModbusDataType dataType;
     private final Short unitId;
     private final ModbusByteOrder byteOrder;
+    private final String deviceId;
 
     public static ModbusTag of(String addressString) {
         if (ModbusTagCoil.matches(addressString)) {
@@ -110,6 +111,7 @@ public abstract class ModbusTag implements PlcTag, Serializable {
         } else {
             this.byteOrder = null;
         }
+        this.deviceId = config.get("device-id");
     }
 
     /**
@@ -126,6 +128,20 @@ public abstract class ModbusTag implements PlcTag, Serializable {
 
     public ModbusByteOrder getByteOrder() {
         return byteOrder;
+    }
+
+    /**
+     * Gets the target device ID for server mode operations.
+     *
+     * <p>In TCP Server mode, this identifies which connected DTU device
+     * should receive the Modbus request. The device ID corresponds to
+     * the identifier extracted from the device's registration packet.</p>
+     *
+     * @return the device ID, or null if not specified
+     * @since 0.14.0
+     */
+    public String getDeviceId() {
+        return deviceId;
     }
 
     /**
@@ -175,13 +191,14 @@ public abstract class ModbusTag implements PlcTag, Serializable {
         return address == that.address &&
             quantity == that.quantity &&
             dataType == that.dataType &&
-            unitId == that.unitId &&
+            Objects.equals(unitId, that.unitId) &&
+            Objects.equals(deviceId, that.deviceId) &&
             getClass() == that.getClass(); // MUST be identical
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.getClass(), address, quantity, dataType, unitId);
+        return Objects.hash(this.getClass(), address, quantity, dataType, unitId, deviceId);
     }
 
     @Override
@@ -191,6 +208,7 @@ public abstract class ModbusTag implements PlcTag, Serializable {
             ", quantity=" + quantity +
             ", dataType=" + dataType +
             ", unitId=" + unitId +
+            ", deviceId=" + deviceId +
             " }";
     }
 

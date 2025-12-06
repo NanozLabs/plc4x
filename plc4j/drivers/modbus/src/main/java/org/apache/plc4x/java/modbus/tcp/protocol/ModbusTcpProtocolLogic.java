@@ -114,7 +114,7 @@ public class ModbusTcpProtocolLogic extends ModbusProtocolLogic<ModbusTcpADU> im
 
         // Example for sending a request ...
         if (request.getTagNames().size() == 1) {
-            String tagName = request.getTagNames().getFirst();
+            String tagName = request.getTagNames().iterator().next();
             ModbusTag tag = (ModbusTag) request.getTag(tagName);
             final ModbusPDU requestPdu = getReadRequestPdu(tag);
             final short unitId = getUnitId(tag);
@@ -184,7 +184,7 @@ public class ModbusTcpProtocolLogic extends ModbusProtocolLogic<ModbusTcpADU> im
         //      - FileRecord        (read-write)    --> ModbusPduWriteFileRecordRequest
         // 2. Split up into multiple sub-requests
         if (request.getTagNames().size() == 1) {
-            String tagName = request.getTagNames().getFirst();
+            String tagName = request.getTagNames().iterator().next();
             PlcTag tag = request.getTag(tagName);
             final ModbusPDU requestPdu = getWriteRequestPdu(tag, writeRequest.getPlcValue(tagName));
             final short unitId = getUnitId(tag);
