@@ -48,22 +48,22 @@ import java.util.function.ToIntFunction;
  *
  * <h3>Connection URL Format:</h3>
  * <pre>
- * modbus-tcp-server:tcp-server://[bind-address]:port[?options]
+ * modbus-tcp-server:tcpserver://[bind-address]:port[?options]
  * </pre>
  *
  * <h3>Examples:</h3>
  * <pre>{@code
  * // Listen on all interfaces, port 502
- * modbus-tcp-server:tcp-server://0.0.0.0:502
+ * modbus-tcp-server:tcpserver://0.0.0.0:502
  *
  * // With fixed-length registration (16 bytes)
- * modbus-tcp-server:tcp-server://0.0.0.0:502?registration-type=fixed&registration-length=16
+ * modbus-tcp-server:tcpserver://0.0.0.0:502?registration-type=fixed&registration-length=16
  *
  * // With regex registration pattern
- * modbus-tcp-server:tcp-server://0.0.0.0:502?registration-type=regex&registration-pattern=REG:(.+)\r\n
+ * modbus-tcp-server:tcpserver://0.0.0.0:502?registration-type=regex&registration-pattern=REG:(.+)\r\n
  *
  * // With prefix-length registration
- * modbus-tcp-server:tcp-server://0.0.0.0:502?registration-type=prefix&registration-prefix-bytes=2
+ * modbus-tcp-server:tcpserver://0.0.0.0:502?registration-type=prefix&registration-prefix-bytes=2
  * }</pre>
  *
  * <h3>Key Features:</h3>
@@ -98,7 +98,7 @@ public class ModbusTcpServerDriver extends GeneratedDriverBase<ModbusTcpADU> {
 
     @Override
     protected Optional<Class<? extends PlcTransportConfiguration>> getTransportConfigurationClass(String transportCode) {
-        if ("tcp-server".equals(transportCode)) {
+        if ("tcpserver".equals(transportCode)) {
             return Optional.of(TcpServerTransportConfiguration.class);
         }
         return Optional.empty();
@@ -106,12 +106,12 @@ public class ModbusTcpServerDriver extends GeneratedDriverBase<ModbusTcpADU> {
 
     @Override
     protected Optional<String> getDefaultTransportCode() {
-        return Optional.of("tcp-server");
+        return Optional.of("tcpserver");
     }
 
     @Override
     protected List<String> getSupportedTransportCodes() {
-        return Collections.singletonList("tcp-server");
+        return Collections.singletonList("tcpserver");
     }
 
     /**

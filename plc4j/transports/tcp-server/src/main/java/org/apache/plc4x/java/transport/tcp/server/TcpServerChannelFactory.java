@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 /**
@@ -77,6 +78,8 @@ import java.util.function.Consumer;
  * @since 0.14.0
  */
 public class TcpServerChannelFactory implements ChannelFactory, HasConfiguration<TcpServerTransportConfiguration> {
+
+    private static final AtomicInteger counter = new AtomicInteger(0);
 
     private static final Logger logger = LoggerFactory.getLogger(TcpServerChannelFactory.class);
 
@@ -171,6 +174,8 @@ public class TcpServerChannelFactory implements ChannelFactory, HasConfiguration
     public Channel createChannel(ChannelHandler channelHandler) throws PlcConnectionException {
         Objects.requireNonNull(channelHandler, "Channel handler must not be null");
 
+        logger.info("第{}次执行该代码", counter.incrementAndGet());
+
         // Store the protocol handler for use in child channel initialization
         this.protocolHandlerProvider = channelHandler;
 
@@ -204,6 +209,7 @@ public class TcpServerChannelFactory implements ChannelFactory, HasConfiguration
                 });
 
             // Bind and start accepting connections
+            // ChannelFuture bindFuture = bootstrap.bind(502).sync();
             ChannelFuture bindFuture = bootstrap.bind(bindAddress).sync();
             serverChannel = bindFuture.channel();
 
@@ -216,6 +222,7 @@ public class TcpServerChannelFactory implements ChannelFactory, HasConfiguration
             shutdown();
             throw new PlcConnectionException("Interrupted while starting server", e);
         } catch (Exception e) {
+            logger.error(e.getMessage());
             shutdown();
             throw new PlcConnectionException("Failed to start TCP server on " + bindAddress, e);
         }
@@ -276,8 +283,11 @@ public class TcpServerChannelFactory implements ChannelFactory, HasConfiguration
 
     @Override
     public void closeEventLoopForChannel(Channel channel) {
-        // For server mode, we don't close event loops per channel
-        // The registry handles individual channel cleanup
+        // For server mode, when closing the server channel, perform full shutdown
+        if (channel == serverChannel) {
+            shutdown();
+        }
+        // For child channels (device connections), the registry handles cleanup
     }
 
     /**

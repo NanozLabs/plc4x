@@ -222,6 +222,16 @@ public class DefaultNettyPlcConnection extends AbstractPlcConnection implements 
         return channel;
     }
 
+    /**
+     * Gets the channel factory used by this connection.
+     * Useful for server mode to access transport-specific functionality.
+     *
+     * @return the channel factory
+     */
+    public ChannelFactory getChannelFactory() {
+        return channelFactory;
+    }
+
     public ChannelHandler getChannelHandler(CompletableFuture<Void> sessionSetupCompleteFuture, CompletableFuture<Void> sessionDisconnectCompleteFuture, CompletableFuture<PlcConnectionConfiguration> sessionDiscoverCompleteFuture) {
         if (stackConfigurer == null) {
             throw new IllegalStateException("No Protocol Stack Configurer is given!");

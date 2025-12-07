@@ -39,19 +39,19 @@ import java.util.regex.Pattern;
  *
  * <h3>Connection URL Format:</h3>
  * <pre>
- * protocol:tcp-server://[bind-address]:port[?options]
+ * protocol:tcpserver://[bind-address]:port[?options]
  * </pre>
  *
  * <h3>Examples:</h3>
  * <pre>{@code
  * // Listen on all interfaces, port 502
- * modbus-tcp-server:tcp-server://0.0.0.0:502
+ * modbus-tcp-server:tcpserver://0.0.0.0:502
  *
  * // Listen on specific interface
- * modbus-tcp-server:tcp-server://192.168.1.100:502
+ * modbus-tcp-server:tcpserver://192.168.1.100:502
  *
  * // With registration configuration
- * modbus-tcp-server:tcp-server://0.0.0.0:502?registration-type=fixed&registration-length=16
+ * modbus-tcp-server:tcpserver://0.0.0.0:502?registration-type=fixed&registration-length=16
  * }</pre>
  *
  * <h3>Key Features:</h3>
@@ -82,7 +82,7 @@ public class TcpServerTransport implements Transport, HasConfiguration<TcpServer
 
     @Override
     public String getTransportCode() {
-        return "tcp-server";
+        return "tcpserver";
     }
 
     @Override

@@ -20,9 +20,9 @@ package org.apache.plc4x.java.modbus.tcpserver;
 
 import org.apache.plc4x.java.api.PlcConnection;
 import org.apache.plc4x.java.api.exceptions.PlcRuntimeException;
-import org.apache.plc4x.java.modbus.tcpserver.protocol.ModbusTcpServerProtocolLogic;
 import org.apache.plc4x.java.spi.connection.DefaultNettyPlcConnection;
 import org.apache.plc4x.java.transport.tcp.server.DeviceChannelRegistry;
+import org.apache.plc4x.java.transport.tcp.server.TcpServerChannelFactory;
 
 import java.net.InetSocketAddress;
 import java.time.Instant;
@@ -37,7 +37,7 @@ import java.util.function.Consumer;
  *
  * <h3>Usage Example:</h3>
  * <pre>{@code
- * PlcConnection connection = PlcDriverManager.getConnection("modbus-tcp-server:tcp-server://0.0.0.0:502");
+ * PlcConnection connection = PlcDriverManager.getConnection("modbus-tcp-server:tcpserver://0.0.0.0:502");
  * ModbusTcpServerConnection serverConnection = ModbusTcpServerConnection.of(connection);
  *
  * // Subscribe to device events
@@ -58,7 +58,6 @@ import java.util.function.Consumer;
 public class ModbusTcpServerConnection {
 
     private final PlcConnection connection;
-    private final ModbusTcpServerProtocolLogic protocolLogic;
     private final DeviceChannelRegistry deviceRegistry;
 
     /**
@@ -82,16 +81,16 @@ public class ModbusTcpServerConnection {
         }
 
         DefaultNettyPlcConnection nettyConnection = (DefaultNettyPlcConnection) connection;
-        Object protocol = nettyConnection.getProtocol();
 
-        if (!(protocol instanceof ModbusTcpServerProtocolLogic)) {
+        // For server mode, get DeviceChannelRegistry from TcpServerChannelFactory
+        if (!(nettyConnection.getChannelFactory() instanceof TcpServerChannelFactory)) {
             throw new PlcRuntimeException(
-                "Connection is not a Modbus TCP Server connection. " +
+                "Connection is not using TcpServerChannelFactory. " +
                 "Make sure you're using a modbus-tcp-server:// connection URL.");
         }
 
-        this.protocolLogic = (ModbusTcpServerProtocolLogic) protocol;
-        this.deviceRegistry = protocolLogic.getDeviceRegistry();
+        TcpServerChannelFactory channelFactory = (TcpServerChannelFactory) nettyConnection.getChannelFactory();
+        this.deviceRegistry = channelFactory.getDeviceRegistry();
 
         if (this.deviceRegistry == null) {
             throw new PlcRuntimeException("Device registry not initialized. Connection may not be fully established.");
