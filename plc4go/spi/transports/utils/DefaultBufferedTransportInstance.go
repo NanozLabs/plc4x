@@ -21,8 +21,8 @@ package utils
 
 import (
 	"context"
-	"runtime/debug"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -33,16 +33,15 @@ import (
 
 type DefaultBufferedTransportInstanceRequirements interface {
 	GetReader() transports.ExtendedReader
-	Connect() error
 	IsConnected() bool
+	SetReadDeadline(deadline time.Time) error
 }
 
 type DefaultBufferedTransportInstance interface {
-	ConnectWithContext(ctx context.Context) error
 	GetNumBytesAvailableInBuffer() (uint32, error)
-	FillBuffer(until func(pos uint, currentByte byte, reader transports.ExtendedReader) bool) error
-	PeekReadableBytes(numBytes uint32) ([]byte, error)
-	Read(numBytes uint32) ([]byte, error)
+	FillBuffer(ctx context.Context, until func(pos uint, currentByte byte, reader transports.ExtendedReader) (keepGoing bool)) error
+	PeekReadableBytes(ctx context.Context, numBytes uint32) ([]byte, error)
+	Read(ctx context.Context, numBytes uint32) ([]byte, error)
 }
 
 func NewDefaultBufferedTransportInstance(defaultBufferedTransportInstanceRequirements DefaultBufferedTransportInstanceRequirements, _options ...options.WithOption) DefaultBufferedTransportInstance {
@@ -61,31 +60,6 @@ type defaultBufferedTransportInstance struct {
 	log zerolog.Logger
 }
 
-// ConnectWithContext is a compatibility implementation for those transports not implementing this function
-func (m *defaultBufferedTransportInstance) ConnectWithContext(ctx context.Context) error {
-	ch := make(chan error, 1)
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
-		defer func() {
-			if err := recover(); err != nil {
-				m.log.Error().
-					Str("stack", string(debug.Stack())).
-					Interface("err", err).
-					Msg("panic-ed")
-			}
-		}()
-		ch <- m.Connect()
-		close(ch)
-	}()
-	select {
-	case err := <-ch:
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
 func (m *defaultBufferedTransportInstance) GetNumBytesAvailableInBuffer() (uint32, error) {
 	if !m.IsConnected() {
 		return 0, errors.New("working on a unconnected connection")
@@ -97,7 +71,7 @@ func (m *defaultBufferedTransportInstance) GetNumBytesAvailableInBuffer() (uint3
 	return uint32(m.GetReader().Buffered()), nil
 }
 
-func (m *defaultBufferedTransportInstance) FillBuffer(until func(pos uint, currentByte byte, reader transports.ExtendedReader) bool) error {
+func (m *defaultBufferedTransportInstance) FillBuffer(ctx context.Context, until func(pos uint, currentByte byte, reader transports.ExtendedReader) bool) error {
 	if !m.IsConnected() {
 		return errors.New("working on a unconnected connection")
 	}
@@ -105,8 +79,8 @@ func (m *defaultBufferedTransportInstance) FillBuffer(until func(pos uint, curre
 		return nil
 	}
 	nBytes := uint32(1)
-	for {
-		bytes, err := m.PeekReadableBytes(nBytes)
+	for ctx.Err() == nil {
+		bytes, err := m.PeekReadableBytes(ctx, nBytes)
 		if err != nil {
 			return errors.Wrap(err, "Error while peeking")
 		}
@@ -115,27 +89,40 @@ func (m *defaultBufferedTransportInstance) FillBuffer(until func(pos uint, curre
 		}
 		nBytes++
 	}
+	return errors.Wrap(ctx.Err(), "Timeout while filling buffer")
 }
 
-func (m *defaultBufferedTransportInstance) PeekReadableBytes(numBytes uint32) ([]byte, error) {
+func (m *defaultBufferedTransportInstance) PeekReadableBytes(ctx context.Context, numBytes uint32) ([]byte, error) {
 	if !m.IsConnected() {
 		return nil, errors.New("working on a unconnected connection")
 	}
 	if m.GetReader() == nil {
 		return nil, errors.New("error peeking from transport. No reader available")
 	}
+	if deadline, ok := ctx.Deadline(); ok {
+		m.log.Trace().Time("deadline", deadline).Msg("deadline set")
+		if err := m.SetReadDeadline(deadline); err != nil {
+			return nil, errors.Wrap(err, "error setting read deadline")
+		}
+	}
 	return m.GetReader().Peek(int(numBytes))
 }
 
-func (m *defaultBufferedTransportInstance) Read(numBytes uint32) ([]byte, error) {
+func (m *defaultBufferedTransportInstance) Read(ctx context.Context, numBytes uint32) ([]byte, error) {
 	if !m.IsConnected() {
 		return nil, errors.New("working on a unconnected connection")
 	}
 	if m.GetReader() == nil {
 		return nil, errors.New("error reading from transport. No reader available")
 	}
+	if deadline, ok := ctx.Deadline(); ok {
+		m.log.Trace().Time("deadline", deadline).Msg("deadline set")
+		if err := m.SetReadDeadline(deadline); err != nil {
+			return nil, errors.Wrap(err, "error setting read deadline")
+		}
+	}
 	data := make([]byte, numBytes)
-	for i := uint32(0); i < numBytes; i++ {
+	for i := range numBytes {
 		val, err := m.GetReader().ReadByte()
 		if err != nil {
 			return nil, errors.Wrap(err, "error reading")

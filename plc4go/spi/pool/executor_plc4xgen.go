@@ -49,6 +49,10 @@ func (d *executor) SerializeWithWriteBuffer(ctx context.Context, writeBuffer uti
 		return err
 	}
 
+	if err := writeBuffer.WriteString("name", uint32(len(d.name)*8), d.name); err != nil {
+		return err
+	}
+
 	if err := writeBuffer.WriteBit("running", d.running); err != nil {
 		return err
 	}
@@ -85,6 +89,10 @@ func (d *executor) SerializeWithWriteBuffer(ctx context.Context, writeBuffer uti
 		return err
 	}
 
+	if err := writeBuffer.WriteUint32("workerNumber", 32, d.workerNumber.Load()); err != nil {
+		return err
+	}
+
 	_workItems_plx4gen_description := fmt.Sprintf("%d element(s)", len(d.workItems))
 	if err := writeBuffer.WriteString("workItems", uint32(len(_workItems_plx4gen_description)*8), _workItems_plx4gen_description); err != nil {
 		return err
@@ -92,6 +100,25 @@ func (d *executor) SerializeWithWriteBuffer(ctx context.Context, writeBuffer uti
 
 	if err := writeBuffer.WriteBit("traceWorkers", d.traceWorkers); err != nil {
 		return err
+	}
+
+	if d.ctx != nil {
+		if serializableField, ok := any(d.ctx).(utils.Serializable); ok {
+			if err := writeBuffer.PushContext("ctx"); err != nil {
+				return err
+			}
+			if err := serializableField.SerializeWithWriteBuffer(ctx, writeBuffer); err != nil {
+				return err
+			}
+			if err := writeBuffer.PopContext("ctx"); err != nil {
+				return err
+			}
+		} else {
+			stringValue := fmt.Sprintf("%v", d.ctx)
+			if err := writeBuffer.WriteString("ctx", uint32(len(stringValue)*8), stringValue); err != nil {
+				return err
+			}
+		}
 	}
 	if err := writeBuffer.PopContext("executor"); err != nil {
 		return err

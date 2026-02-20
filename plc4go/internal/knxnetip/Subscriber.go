@@ -64,9 +64,7 @@ func NewSubscriber(connection *Connection, _options ...options.WithOption) *Subs
 func (s *Subscriber) Subscribe(ctx context.Context, subscriptionRequest apiModel.PlcSubscriptionRequest) <-chan apiModel.PlcSubscriptionRequestResult {
 	// TODO: handle context
 	result := make(chan apiModel.PlcSubscriptionRequestResult, 1)
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
+	s.wg.Go(func() {
 		defer func() {
 			if err := recover(); err != nil {
 				result <- spiModel.NewDefaultPlcSubscriptionRequestResult(subscriptionRequest, nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack()))
@@ -96,7 +94,7 @@ func (s *Subscriber) Subscribe(ctx context.Context, subscriptionRequest apiModel
 			),
 			nil,
 		)
-	}()
+	})
 	return result
 }
 
@@ -147,7 +145,7 @@ func (s *Subscriber) handleValueChange(ctx context.Context, destinationAddress [
 				continue
 			}
 			// If the size of the tag is greater than 6, we have to skip the first byte
-			if groupAddressTag.GetTagType().GetLengthInBits(context.Background()) > 6 {
+			if groupAddressTag.GetTagType().GetLengthInBits(ctx) > 6 {
 				_, _ = rb.ReadUint8("groupAddress", 8)
 			}
 			elementType := *groupAddressTag.GetTagType()
@@ -174,7 +172,7 @@ func (s *Subscriber) handleValueChange(ctx context.Context, destinationAddress [
 					plcValue := spiValues.NewPlcRawByteArray(rb.GetBytes())
 					plcValueList = append(plcValueList, plcValue)
 				} else {
-					plcValue, err2 := driverModel.KnxDatapointParseWithBuffer(context.Background(), rb, elementType)
+					plcValue, err2 := driverModel.KnxDatapointParseWithBuffer(ctx, rb, elementType)
 					if err2 == nil {
 						plcValueList = append(plcValueList, plcValue)
 					} else {

@@ -21,10 +21,12 @@ package serial
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/jacobsa/go-serial/serial"
 	"github.com/pkg/errors"
@@ -53,6 +55,8 @@ type TransportInstance struct {
 	log zerolog.Logger
 }
 
+var _ transports.TransportInstance = (*TransportInstance)(nil)
+
 func NewTransportInstance(serialPortName string, baudRate uint, connectTimeout uint32, transport *Transport, _options ...options.WithOption) *TransportInstance {
 	customLogger := options.ExtractCustomLoggerOrDefaultToGlobal(_options...)
 	transportInstance := &TransportInstance{
@@ -67,7 +71,7 @@ func NewTransportInstance(serialPortName string, baudRate uint, connectTimeout u
 	return transportInstance
 }
 
-func (m *TransportInstance) Connect() error {
+func (m *TransportInstance) Connect(ctx context.Context) error {
 	m.stateChangeMutex.Lock()
 	defer m.stateChangeMutex.Unlock()
 	if m.connected.Load() {
@@ -94,6 +98,10 @@ func (m *TransportInstance) Connect() error {
 	return nil
 }
 
+func (m *TransportInstance) Reset() {
+	// No-Op
+}
+
 func (m *TransportInstance) Close() error {
 	defer utils.StopWarn(m.log)()
 	m.stateChangeMutex.Lock()
@@ -116,13 +124,14 @@ func (m *TransportInstance) IsConnected() bool {
 	return m.serialPort != nil
 }
 
-func (m *TransportInstance) Write(data []byte) error {
+func (m *TransportInstance) Write(ctx context.Context, data []byte) error {
 	if !m.connected.Load() {
 		return errors.New("error writing to transport. Not connected")
 	}
 	if m.serialPort == nil {
 		return errors.New("error writing to transport. No writer available")
 	}
+	// TODO: big oof.... there is no way to set a timeout on the write operation.
 	num, err := m.serialPort.Write(data)
 	if err != nil {
 		return errors.Wrap(err, "error writing")
@@ -135,6 +144,11 @@ func (m *TransportInstance) Write(data []byte) error {
 
 func (m *TransportInstance) GetReader() transports.ExtendedReader {
 	return m.reader
+}
+
+func (m *TransportInstance) SetReadDeadline(deadline time.Time) error {
+	// TODO: big oof.... there is no way to set a timeout
+	return nil
 }
 
 func (m *TransportInstance) String() string {

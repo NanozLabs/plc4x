@@ -56,6 +56,10 @@ type MessageCodec struct {
 	log            zerolog.Logger
 }
 
+var (
+	_ spi.TransportInstanceExposer = (*MessageCodec)(nil)
+)
+
 func NewMessageCodec(transportInstance transports.TransportInstance, _options ...options.WithOption) *MessageCodec {
 	passLoggerToModel, _ := options.ExtractPassLoggerToModel(_options...)
 	customLogger := options.ExtractCustomLoggerOrDefaultToGlobal(_options...)
@@ -73,11 +77,7 @@ func (m *MessageCodec) GetCodec() spi.MessageCodec {
 	return m
 }
 
-func (m *MessageCodec) Connect() error {
-	return m.ConnectWithContext(context.Background())
-}
-
-func (m *MessageCodec) ConnectWithContext(ctx context.Context) error {
+func (m *MessageCodec) Connect(ctx context.Context) error {
 	m.stateChange.Lock()
 	defer m.stateChange.Unlock()
 	if m.IsRunning() {
@@ -86,7 +86,7 @@ func (m *MessageCodec) ConnectWithContext(ctx context.Context) error {
 	m.log.Trace().Msg("building channels")
 	m.monitoredMMIs = make(chan readWriteModel.CALReply, 100)
 	m.monitoredSALs = make(chan readWriteModel.MonitoredSAL, 100)
-	return m.DefaultCodec.ConnectWithContext(ctx)
+	return m.DefaultCodec.Connect(ctx)
 }
 
 func (m *MessageCodec) Disconnect() error {
@@ -102,8 +102,8 @@ func (m *MessageCodec) Disconnect() error {
 	return err
 }
 
-func (m *MessageCodec) Send(message spi.Message) error {
-	m.log.Trace().Stringer("message", message).Msg("Sending message")
+func (m *MessageCodec) Send(ctx context.Context, interactionInfo string, message spi.Message) error {
+	m.log.Trace().Str("interactionInfo", interactionInfo).Interface("message", message).Msg("Sending message")
 	// Cast the message to the correct type of struct
 	cbusMessage, ok := message.(readWriteModel.CBusMessage)
 	if !ok {
@@ -112,7 +112,7 @@ func (m *MessageCodec) Send(message spi.Message) error {
 
 	// Set the right request context
 	m.requestContext = CreateRequestContext(cbusMessage)
-	m.log.Debug().Stringer("requestContext", m.requestContext).Msg("Created request context")
+	m.log.Debug().Interface("requestContext", m.requestContext).Msg("Created request context")
 
 	// Serialize the request
 	theBytes, err := cbusMessage.Serialize()
@@ -121,14 +121,14 @@ func (m *MessageCodec) Send(message spi.Message) error {
 	}
 
 	// Send it to the PLC
-	err = m.GetTransportInstance().Write(theBytes)
+	err = m.GetTransportInstance().Write(ctx, theBytes)
 	if err != nil {
 		return errors.Wrap(err, "error sending request")
 	}
 	return nil
 }
 
-func (m *MessageCodec) Receive() (spi.Message, error) {
+func (m *MessageCodec) Receive(ctx context.Context) (spi.Message, error) {
 	m.log.Trace().Msg("Receive")
 	ti := m.GetTransportInstance()
 	if !ti.IsConnected() {
@@ -137,8 +137,8 @@ func (m *MessageCodec) Receive() (spi.Message, error) {
 	confirmation := false
 	// Fill the buffer
 	{
-		if err := ti.FillBuffer(func(pos uint, currentByte byte, reader transports.ExtendedReader) bool {
-			m.log.Trace().Uint8("byte", currentByte).Msg("current byte")
+		fillCtx, fillCtxCancel := context.WithTimeout(ctx, 100*time.Millisecond)
+		if err := ti.FillBuffer(fillCtx, func(pos uint, currentByte byte, reader transports.ExtendedReader) (keepGoing bool) {
 			switch currentByte {
 			case
 				readWriteModel.ResponseTermination_CR,
@@ -148,7 +148,10 @@ func (m *MessageCodec) Receive() (spi.Message, error) {
 				confirmation = true
 				// In case we have directly more data in the buffer after a confirmation
 				_, err := reader.Peek(int(pos + 1))
-				return err == nil
+				if err != nil {
+					return false
+				}
+				return true
 			case
 				byte(readWriteModel.ConfirmationType_NOT_TRANSMITTED_TO_MANY_RE_TRANSMISSIONS),
 				byte(readWriteModel.ConfirmationType_NOT_TRANSMITTED_CORRUPTION),
@@ -162,9 +165,11 @@ func (m *MessageCodec) Receive() (spi.Message, error) {
 			}
 		}); err != nil {
 			m.log.Debug().Err(err).Msg("Error filling buffer")
+		} else {
+			m.log.Trace().Msg("Buffer filled")
 		}
+		fillCtxCancel()
 	}
-	m.log.Trace().Msg("Buffer filled")
 
 	// Check how many readable bytes we have
 	var readableBytes uint32
@@ -183,14 +188,14 @@ func (m *MessageCodec) Receive() (spi.Message, error) {
 	m.log.Trace().Uint32("readableBytes", readableBytes).Msg("readableBytes bytes available in buffer")
 
 	// Check for an isolated error
-	if bytes, err := ti.PeekReadableBytes(1); err == nil && (bytes[0] == byte(readWriteModel.ConfirmationType_CHECKSUM_FAILURE)) {
-		_, _ = ti.Read(1)
+	if bytes, err := ti.PeekReadableBytes(ctx, 1); err == nil && (bytes[0] == byte(readWriteModel.ConfirmationType_CHECKSUM_FAILURE)) {
+		_, _ = ti.Read(ctx, 1)
 		// Report one Error at a time
-		ctxForModel := options.GetLoggerContextForModel(context.TODO(), m.log, options.WithPassLoggerToModel(m.passLogToModel))
+		ctxForModel := options.GetLoggerContextForModel(ctx, m.log, options.WithPassLoggerToModel(m.passLogToModel))
 		return readWriteModel.CBusMessageParse[readWriteModel.CBusMessage](ctxForModel, bytes, true, m.requestContext, m.cbusOptions)
 	}
 
-	peekedBytes, err := ti.PeekReadableBytes(readableBytes)
+	peekedBytes, err := ti.PeekReadableBytes(ctx, readableBytes)
 	pciResponse, requestToPci := false, false
 	indexOfCR := -1
 	indexOfLF := -1
@@ -229,7 +234,7 @@ lookingForTheEnd:
 	if indexOfCR < 0 && indexOfLF >= 0 {
 		// This means that the package is garbage as a lf is always prefixed with a cr
 		m.log.Debug().Err(err).Msg("Error reading")
-		garbage, err := ti.Read(readableBytes)
+		garbage, err := ti.Read(ctx, readableBytes)
 		m.log.Warn().Bytes("garbage", garbage).Msg("Garbage bytes")
 		return nil, err
 	}
@@ -299,7 +304,7 @@ lookingForTheEnd:
 
 	// We need to ensure that there is no ! till the first /r
 	{
-		peekedBytes, err := ti.PeekReadableBytes(readableBytes)
+		peekedBytes, err := ti.PeekReadableBytes(ctx, readableBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -321,7 +326,7 @@ lookingForTheEnd:
 				Uint64("currentlyReportedServerErrors", currentlyReportedServerErrors).
 				Msg("We found foundErrors errors in the current message. We have currentlyReportedServerErrors reported already")
 			m.currentlyReportedServerErrors.Add(1)
-			ctxForModel := options.GetLoggerContextForModel(context.TODO(), m.log, options.WithPassLoggerToModel(m.passLogToModel))
+			ctxForModel := options.GetLoggerContextForModel(ctx, m.log, options.WithPassLoggerToModel(m.passLogToModel))
 			return readWriteModel.CBusMessageParse[readWriteModel.CBusMessage](ctxForModel, []byte{'!'}, true, m.requestContext, m.cbusOptions)
 		}
 		if foundErrors > 0 {
@@ -339,7 +344,7 @@ lookingForTheEnd:
 	var rawInput []byte
 	{
 		m.log.Trace().Int("packetLength", packetLength).Msg("Read packet length")
-		read, err := ti.Read(uint32(packetLength))
+		read, err := ti.Read(ctx, uint32(packetLength))
 		if err != nil {
 			return nil, errors.Wrap(err, "Invalid state... If we have peeked that before we should be able to read that now")
 		}
@@ -355,10 +360,8 @@ lookingForTheEnd:
 		}
 	}
 	m.log.Debug().Bytes("sanitizedInput", sanitizedInput).Msg("Parsing")
-	ctxForModel := options.GetLoggerContextForModel(context.TODO(), m.log, options.WithPassLoggerToModel(m.passLogToModel))
-	start := time.Now()
+	ctxForModel := options.GetLoggerContextForModel(ctx, m.log, options.WithPassLoggerToModel(m.passLogToModel))
 	cBusMessage, err := readWriteModel.CBusMessageParse[readWriteModel.CBusMessage](ctxForModel, sanitizedInput, pciResponse, m.requestContext, m.cbusOptions)
-	m.log.Trace().TimeDiff("elapsedTime", time.Now(), start).Msg("Parsing took elapsedTime")
 	if err != nil {
 		m.log.Debug().Err(err).Msg("First Parse Failed")
 		{ // Try SAL
@@ -393,7 +396,7 @@ lookingForTheEnd:
 }
 
 func extractMMIAndSAL(log zerolog.Logger) _default.CustomMessageHandler {
-	return func(codec _default.DefaultCodecRequirements, message spi.Message) bool {
+	return func(ctx context.Context, codec _default.DefaultCodecRequirements, message spi.Message) bool {
 		switch message := message.(type) {
 		case readWriteModel.CBusMessageToClient:
 			switch reply := message.GetReply().(type) {
@@ -403,13 +406,23 @@ func extractMMIAndSAL(log zerolog.Logger) _default.CustomMessageHandler {
 					switch encodedReply := reply.GetEncodedReply().(type) {
 					case readWriteModel.MonitoredSALReply:
 						log.Trace().Msg("Feed to monitored SALs")
-						codec.(*MessageCodec).monitoredSALs <- encodedReply.GetMonitoredSAL()
+						select {
+						case codec.(*MessageCodec).monitoredSALs <- encodedReply.GetMonitoredSAL():
+							return true
+						case <-ctx.Done():
+							return false
+						}
 					case readWriteModel.EncodedReplyCALReply:
 						calData := encodedReply.GetCalReply().GetCalData()
 						switch calData.(type) {
 						case readWriteModel.CALDataStatus, readWriteModel.CALDataStatusExtended:
 							log.Trace().Msg("Feed to monitored MMIs")
-							codec.(*MessageCodec).monitoredMMIs <- encodedReply.GetCalReply()
+							select {
+							case codec.(*MessageCodec).monitoredMMIs <- encodedReply.GetCalReply():
+								return true
+							case <-ctx.Done():
+								return false
+							}
 						default:
 							log.Trace().
 								Type("actualType", calData).

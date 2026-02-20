@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -101,13 +100,9 @@ func (m Browser) executeDeviceQuery(ctx context.Context, query DeviceQuery, inte
 	// Parse each of these expanded addresses and handle them accordingly.
 	for _, knxAddress := range knxAddresses {
 		// Send a connection request to the device
-		connectTtlTimer := time.NewTimer(m.connection.defaultTtl)
 		deviceConnections := m.connection.DeviceConnect(ctx, knxAddress)
 		select {
 		case deviceConnection := <-deviceConnections:
-			if !connectTtlTimer.Stop() {
-				<-connectTtlTimer.C
-			}
 			// If the request returned a connection, process it,
 			// otherwise just ignore it.
 			if deviceConnection.connection != nil {
@@ -137,20 +132,14 @@ func (m Browser) executeDeviceQuery(ctx context.Context, query DeviceQuery, inte
 					queryResults = append(queryResults, queryResult)
 				}
 
-				disconnectTtlTimer := time.NewTimer(10 * m.connection.defaultTtl)
 				deviceDisconnections := m.connection.DeviceDisconnect(ctx, knxAddress)
 				select {
 				case _ = <-deviceDisconnections:
-					if !disconnectTtlTimer.Stop() {
-						<-disconnectTtlTimer.C
-					}
-				case <-disconnectTtlTimer.C:
-					disconnectTtlTimer.Stop()
+				case <-ctx.Done():
 					// Just ignore this case ...
 				}
 			}
-		case <-connectTtlTimer.C:
-			connectTtlTimer.Stop()
+		case <-ctx.Done():
 			// In this case the remote was just not responding.
 		}
 		// Just to slow things down a bit (This way we can't exceed the max number of requests per minute)
@@ -182,7 +171,7 @@ func (m Browser) executeCommunicationObjectQuery(ctx context.Context, query Comm
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating read request")
 	}
-	rrr := readRequest.Execute()
+	rrr := readRequest.Execute(ctx)
 	readResult := <-rrr
 	if readResult.GetErr() != nil {
 		return nil, errors.Wrap(readResult.GetErr(), "error reading the group address table starting address:")
@@ -209,7 +198,7 @@ func (m Browser) executeCommunicationObjectQuery(ctx context.Context, query Comm
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating read request")
 	}
-	rrr = readRequest.Execute()
+	rrr = readRequest.Execute(ctx)
 	readResult = <-rrr
 	if readResult.GetErr() != nil {
 		return nil, errors.Wrap(readResult.GetErr(), "error reading the number of group address table entries")
@@ -240,7 +229,7 @@ func (m Browser) executeCommunicationObjectQuery(ctx context.Context, query Comm
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating read request")
 	}
-	rrr = readRequest.Execute()
+	rrr = readRequest.Execute(ctx)
 	readResult = <-rrr
 	if readResult.GetErr() != nil {
 		return nil, errors.Wrap(readResult.GetErr(), "error reading the group address table content")
@@ -274,7 +263,7 @@ func (m Browser) executeCommunicationObjectQuery(ctx context.Context, query Comm
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating read request")
 	}
-	rrr = readRequest.Execute()
+	rrr = readRequest.Execute(ctx)
 	readResult = <-rrr
 	if readResult.GetErr() != nil {
 		return nil, errors.Wrap(readResult.GetErr(), "error reading the group address association table address")
@@ -300,7 +289,7 @@ func (m Browser) executeCommunicationObjectQuery(ctx context.Context, query Comm
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating read request")
 	}
-	rrr = readRequest.Execute()
+	rrr = readRequest.Execute(ctx)
 	readResult = <-rrr
 	if readResult.GetErr() != nil {
 		return nil, errors.Wrap(readResult.GetErr(), "error reading the number of group address association table entries")
@@ -329,7 +318,7 @@ func (m Browser) executeCommunicationObjectQuery(ctx context.Context, query Comm
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating read request")
 	}
-	rrr = readRequest.Execute()
+	rrr = readRequest.Execute(ctx)
 	readResult = <-rrr
 	if readResult.GetErr() != nil {
 		return nil, errors.Wrap(readResult.GetErr(), "error reading the group address association table content")
@@ -375,7 +364,7 @@ func (m Browser) executeCommunicationObjectQuery(ctx context.Context, query Comm
 		if err != nil {
 			return nil, errors.Wrap(err, "error creating read request")
 		}
-		rrr = readRequest.Execute()
+		rrr = readRequest.Execute(ctx)
 		readResult = <-rrr
 		for groupAddress, comObjectNumber := range groupAddressComObjectNumberMapping {
 			if readResult.GetResponse().GetResponseCode(strconv.Itoa(int(comObjectNumber))) != apiModel.PlcResponseCode_OK {
@@ -440,7 +429,7 @@ func (m Browser) executeCommunicationObjectQuery(ctx context.Context, query Comm
 			return nil, errors.Wrap(err, "error creating read request")
 		}
 
-		rrr = readRequest.Execute()
+		rrr = readRequest.Execute(ctx)
 		readRequestResult := <-rrr
 		readResponse := readRequestResult.GetResponse()
 		var programVersionData []byte
@@ -473,7 +462,7 @@ func (m Browser) executeCommunicationObjectQuery(ctx context.Context, query Comm
 		if err != nil {
 			return nil, errors.Wrap(err, "error creating read request")
 		}
-		rrr = readRequest.Execute()
+		rrr = readRequest.Execute(ctx)
 		readResult = <-rrr
 
 		for _, tagName := range readResult.GetResponse().GetTagNames() {
@@ -517,11 +506,11 @@ func (m Browser) executeCommunicationObjectQuery(ctx context.Context, query Comm
 		if err != nil {
 			return nil, errors.Wrap(err, "error creating read request")
 		}
-		rrr = readRequest.Execute()
+		rrr = readRequest.Execute(ctx)
 		readResult = <-rrr
 		if readResult.GetResponse().GetResponseCode("comObjectTableAddress") == apiModel.PlcResponseCode_OK {
 			comObjectTableAddress := readResult.GetResponse().GetValue("comObjectTableAddress")
-			m.log.Info().Stringer("comObjectTableAddress", comObjectTableAddress).Msg("Com Object Table Address")
+			m.log.Info().Interface("comObjectTableAddress", comObjectTableAddress).Msg("Com Object Table Address")
 		}
 	}
 
@@ -569,7 +558,7 @@ func (m Browser) explodeSegment(segment string, min uint8, max uint8) ([]uint8, 
 	} else if strings.HasPrefix(segment, "[") && strings.HasSuffix(segment, "]") {
 		segment = strings.TrimPrefix(segment, "[")
 		segment = strings.TrimSuffix(segment, "]")
-		for _, segment := range strings.Split(segment, ",") {
+		for segment := range strings.SplitSeq(segment, ",") {
 			if strings.Contains(segment, "-") {
 				split := strings.Split(segment, "-")
 				localMin, err := strconv.ParseUint(split[0], 10, 8)

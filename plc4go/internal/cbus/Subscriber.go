@@ -64,9 +64,7 @@ func NewSubscriber(addSubscriber func(subscriber *Subscriber), _options ...optio
 
 func (s *Subscriber) Subscribe(_ context.Context, subscriptionRequest apiModel.PlcSubscriptionRequest) <-chan apiModel.PlcSubscriptionRequestResult {
 	result := make(chan apiModel.PlcSubscriptionRequestResult, 1)
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
+	s.wg.Go(func() {
 		defer func() {
 			if err := recover(); err != nil {
 				result <- spiModel.NewDefaultPlcSubscriptionRequestResult(subscriptionRequest, nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack()))
@@ -106,7 +104,7 @@ func (s *Subscriber) Subscribe(_ context.Context, subscriptionRequest apiModel.P
 			),
 			nil,
 		)
-	}()
+	})
 	return result
 }
 
@@ -124,7 +122,7 @@ func (s *Subscriber) Unsubscribe(ctx context.Context, unsubscriptionRequest apiM
 }
 
 func (s *Subscriber) handleMonitoredMMI(calReply readWriteModel.CALReply) bool {
-	s.log.Debug().Stringer("calReply", calReply).Msg("handling")
+	s.log.Debug().Interface("calReply", calReply).Msg("handling")
 	var unitAddressString string
 	switch calReply := calReply.(type) {
 	case readWriteModel.CALReplyLong:
@@ -152,7 +150,7 @@ func (s *Subscriber) handleMonitoredMMI(calReply readWriteModel.CALReply) bool {
 			Interface("consumer", consumer).
 			Msg("Checking with registration and consumer")
 		for _, subscriptionHandle := range registration.GetSubscriptionHandles() {
-			s.log.Debug().Stringer("subscriptionHandle", subscriptionHandle).Msg("offering to")
+			s.log.Debug().Interface("subscriptionHandle", subscriptionHandle).Msg("offering to")
 			handleHandled := s.offerMMI(unitAddressString, calData, subscriptionHandle.(*SubscriptionHandle), consumer)
 			s.log.Debug().Bool("handleHandled", handleHandled).Msg("handle handled")
 			handled = handled || handleHandled
@@ -305,6 +303,7 @@ func (s *Subscriber) handleMonitoredSAL(sal readWriteModel.MonitoredSAL) bool {
 }
 
 func (s *Subscriber) offerSAL(sal readWriteModel.MonitoredSAL, subscriptionHandle *SubscriptionHandle, consumer apiModel.PlcSubscriptionEventConsumer) bool {
+	ctx := context.TODO()
 	tag, ok := subscriptionHandle.tag.(*salMonitorTag)
 	if !ok {
 		s.log.Debug().Interface("tag", subscriptionHandle.tag).Msg("Unusable tag for mmi subscription")
@@ -432,7 +431,7 @@ func (s *Subscriber) offerSAL(sal readWriteModel.MonitoredSAL, subscriptionHandl
 	address[tagName] = fmt.Sprintf("sal/%s/%s", applicationString, commandType)
 
 	rbvb := spiValues.NewWriteBufferPlcValueBased()
-	err := salData.SerializeWithWriteBuffer(context.Background(), rbvb)
+	err := salData.SerializeWithWriteBuffer(ctx, rbvb)
 	if err != nil {
 		s.log.Error().Err(err).Msg("Error serializing to plc value... just returning it as string")
 		plcValues[tagName] = spiValues.NewPlcSTRING(fmt.Sprintf("%s", salData))

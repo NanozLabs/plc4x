@@ -23,7 +23,6 @@ import (
 	"context"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -255,94 +254,7 @@ func Test_convertToInternalOptions(t *testing.T) {
 	}
 }
 
-func Test_plcConnectionConnectResult_GetConnection(t *testing.T) {
-	type fields struct {
-		connection PlcConnection
-		err        error
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   PlcConnection
-	}{
-		{
-			name: "get it",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			d := &plcConnectionConnectResult{
-				connection: tt.fields.connection,
-				err:        tt.fields.err,
-			}
-			if got := d.GetConnection(); !assert.Equal(t, got, tt.want) {
-				t.Errorf("GetConnection() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_plcConnectionConnectResult_GetErr(t *testing.T) {
-	type fields struct {
-		connection PlcConnection
-		err        error
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		wantErr bool
-	}{
-		{
-			name: "get it",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			d := &plcConnectionConnectResult{
-				connection: tt.fields.connection,
-				err:        tt.fields.err,
-			}
-			if err := d.GetErr(); (err != nil) != tt.wantErr {
-				t.Errorf("GetErr() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func Test_plcDriverManger_Discover(t *testing.T) {
-	type fields struct {
-		drivers    map[string]PlcDriver
-		transports map[string]transports.Transport
-	}
-	type args struct {
-		callback         func(event model.PlcDiscoveryItem)
-		discoveryOptions []WithDiscoveryOption
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "discover it",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := &plcDriverManger{
-				drivers:    tt.fields.drivers,
-				transports: tt.fields.transports,
-			}
-			m.log = produceTestingLogger(t)
-			if err := m.Discover(tt.args.callback, tt.args.discoveryOptions...); (err != nil) != tt.wantErr {
-				t.Errorf("Discover() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_plcDriverManger_DiscoverWithContext(t *testing.T) {
 	type fields struct {
 		drivers    map[string]PlcDriver
 		transports map[string]transports.Transport
@@ -379,7 +291,7 @@ func Test_plcDriverManger_DiscoverWithContext(t *testing.T) {
 				expect := driver.EXPECT()
 				expect.GetProtocolName().Return("test")
 				expect.SupportsDiscovery().Return(true)
-				expect.DiscoverWithContext(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				expect.Discover(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				fields.drivers["test"] = driver
 			},
 		},
@@ -403,7 +315,7 @@ func Test_plcDriverManger_DiscoverWithContext(t *testing.T) {
 				expect := driver.EXPECT()
 				expect.GetProtocolName().Return("test")
 				expect.SupportsDiscovery().Return(true)
-				expect.DiscoverWithContext(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("Uh no"))
+				expect.Discover(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("Uh no"))
 				fields.drivers["test"] = driver
 			},
 			wantErr: true,
@@ -419,8 +331,8 @@ func Test_plcDriverManger_DiscoverWithContext(t *testing.T) {
 				transports: tt.fields.transports,
 			}
 			m.log = produceTestingLogger(t)
-			if err := m.DiscoverWithContext(tt.args.ctx, tt.args.callback, tt.args.discoveryOptions...); (err != nil) != tt.wantErr {
-				t.Errorf("DiscoverWithContext() error = %v, wantErr %v", err, tt.wantErr)
+			if err := m.Discover(tt.args.ctx, tt.args.callback, tt.args.discoveryOptions...); (err != nil) != tt.wantErr {
+				t.Errorf("Discover() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -439,40 +351,25 @@ func Test_plcDriverManger_GetConnection(t *testing.T) {
 		fields       fields
 		args         args
 		setup        func(t *testing.T, fields *fields, args *args)
-		wantVerifier func(t *testing.T, results <-chan PlcConnectionConnectResult) bool
+		wantVerifier func(t *testing.T, conn PlcConnection) bool
+		wantErr      assert.ErrorAssertionFunc
 	}{
 		{
 			name: "get one with wrong url",
 			args: args{
 				connectionString: "~:/?#[]@!$&'()*+,;=\n",
 			},
-			wantVerifier: func(t *testing.T, results <-chan PlcConnectionConnectResult) bool {
-				timeout := time.NewTimer(3 * time.Second)
-				select {
-				case <-timeout.C:
-					t.Error("timeout")
-				case result := <-results:
-					assert.NotNil(t, result)
-					assert.Nil(t, result.GetConnection())
-					assert.NotNil(t, result.GetErr())
-				}
-				return true
+			wantVerifier: func(t *testing.T, conn PlcConnection) bool {
+				return assert.Nil(t, conn)
 			},
+			wantErr: assert.Error,
 		},
 		{
 			name: "get one without a driver",
-			wantVerifier: func(t *testing.T, results <-chan PlcConnectionConnectResult) bool {
-				timeout := time.NewTimer(3 * time.Second)
-				select {
-				case <-timeout.C:
-					t.Error("timeout")
-				case result := <-results:
-					assert.NotNil(t, result)
-					assert.Nil(t, result.GetConnection())
-					assert.NotNil(t, result.GetErr())
-				}
-				return true
+			wantVerifier: func(t *testing.T, conn PlcConnection) bool {
+				return assert.Nil(t, conn)
 			},
+			wantErr: assert.Error,
 		},
 		{
 			name: "get one with a driver",
@@ -487,26 +384,13 @@ func Test_plcDriverManger_GetConnection(t *testing.T) {
 				expect := driver.EXPECT()
 				expect.GetProtocolName().Return("test")
 				expect.GetDefaultTransport().Return("test")
-				results := make(chan PlcConnectionConnectResult, 1)
-				result := NewMockPlcConnectionConnectResult(t)
-				result.EXPECT().GetConnection().Return(nil)
-				result.EXPECT().GetErr().Return(nil)
-				results <- result
-				expect.GetConnection(mock.Anything, mock.Anything, mock.Anything).Return(results)
+				expect.GetConnection(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 				fields.drivers["test"] = driver
 			},
-			wantVerifier: func(t *testing.T, results <-chan PlcConnectionConnectResult) bool {
-				timeout := time.NewTimer(3 * time.Second)
-				select {
-				case <-timeout.C:
-					t.Error("timeout")
-				case result := <-results:
-					assert.NotNil(t, result)
-					assert.Nil(t, result.GetConnection())
-					assert.Nil(t, result.GetErr())
-				}
-				return true
+			wantVerifier: func(t *testing.T, conn PlcConnection) bool {
+				return assert.Nil(t, conn)
 			},
+			wantErr: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
@@ -519,7 +403,9 @@ func Test_plcDriverManger_GetConnection(t *testing.T) {
 				transports: tt.fields.transports,
 			}
 			m.log = produceTestingLogger(t)
-			if got := m.GetConnection(tt.args.connectionString); !tt.wantVerifier(t, got) {
+			got, err := m.GetConnection(t.Context(), tt.args.connectionString)
+			tt.wantErr(t, err)
+			if !tt.wantVerifier(t, got) {
 				t.Errorf("GetConnection() = %v", got)
 			}
 		})

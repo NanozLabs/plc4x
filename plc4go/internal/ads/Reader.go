@@ -44,9 +44,7 @@ func (m *Connection) ReadRequestBuilder() apiModel.PlcReadRequestBuilder {
 func (m *Connection) Read(ctx context.Context, readRequest apiModel.PlcReadRequest) <-chan apiModel.PlcReadRequestResult {
 	m.log.Trace().Msg("Reading")
 	result := make(chan apiModel.PlcReadRequestResult, 1)
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
+	m.wg.Go(func() {
 		defer func() {
 			if err := recover(); err != nil {
 				result <- spiModel.NewDefaultPlcReadRequestResult(readRequest, nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack()))
@@ -57,7 +55,7 @@ func (m *Connection) Read(ctx context.Context, readRequest apiModel.PlcReadReque
 		} else {
 			m.multiRead(ctx, readRequest, result)
 		}
-	}()
+	})
 	return result
 }
 
@@ -97,9 +95,7 @@ func (m *Connection) singleRead(ctx context.Context, readRequest apiModel.PlcRea
 		return
 	}
 
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
+	m.wg.Go(func() {
 		defer func() {
 			if err := recover(); err != nil {
 				result <- spiModel.NewDefaultPlcReadRequestResult(readRequest, nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack()))
@@ -140,7 +136,7 @@ func (m *Connection) singleRead(ctx context.Context, readRequest apiModel.PlcRea
 			spiModel.NewDefaultPlcReadResponse(readRequest, responseCodes, plcValues),
 			nil,
 		)
-	}()
+	})
 }
 
 func (m *Connection) multiRead(ctx context.Context, readRequest apiModel.PlcReadRequest, result chan apiModel.PlcReadRequestResult) {
@@ -260,6 +256,7 @@ func (m *Connection) multiRead(ctx context.Context, readRequest apiModel.PlcRead
 }
 
 func (m *Connection) parsePlcValue(dataType driverModel.AdsDataTypeTableEntry, arrayInfo []driverModel.AdsDataTypeArrayInfo, rb utils.ReadBufferByteBased) (apiValues.PlcValue, error) {
+	ctx := context.TODO()
 	// Decode the data according to the information from the request
 	// Based on the AdsDataTypeTableEntry in tag.DataType() parse the data
 	if len(arrayInfo) > 0 {
@@ -293,7 +290,7 @@ func (m *Connection) parsePlcValue(dataType driverModel.AdsDataTypeTableEntry, a
 			}
 			if child.GetOffset() > curPos {
 				skipBytes := child.GetOffset() - curPos
-				for i := uint32(0); i < skipBytes; i++ {
+				for range skipBytes {
 					_, _ = rb.ReadByte("")
 				}
 			}
@@ -316,6 +313,6 @@ func (m *Connection) parsePlcValue(dataType driverModel.AdsDataTypeTableEntry, a
 		if !ok {
 			return nil, errors.New(fmt.Sprintf("error converting plc4x plc-value type %s into ads plc-value type", valueType.String()))
 		}
-		return driverModel.DataItemParseWithBuffer(context.Background(), rb, adsValueType, stringLength)
+		return driverModel.DataItemParseWithBuffer(ctx, rb, adsValueType, stringLength)
 	}
 }

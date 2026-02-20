@@ -72,7 +72,14 @@ exec:
 clean:
 	@-$(MAKE) go-clean
 
+sync-code: go-mod-tidy go-generate go-mocks go-fmt
+
 go-compile: go-get go-build
+
+go-mod-tidy:
+	@echo "  > go tidy..."
+	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go mod tidy
+	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go mod tidy
 
 go-build: go-fmt
 	@echo "  >  Building binary..."
@@ -92,8 +99,17 @@ go-clean:
 	@echo "  >  Cleaning build cache"
 	$(MVNBIN) clean
 
-go-fmt:
+go-imports:
+	@echo "  > adjusting imports"
+	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go tool goimports-reviser -excludes .idea,.git ./...
+
+go-fmt: go-imports
+	@echo "  > formatting files"
 	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go fmt ./...
+
+go-mocks:
+	@echo "  > generating mocks"
+	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go tool mockery
 
 .PHONY: help
 all: help

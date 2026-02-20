@@ -66,12 +66,9 @@ func NewReader(invokeIdGenerator *InvokeIdGenerator, messageCodec spi.MessageCod
 }
 
 func (m *Reader) Read(ctx context.Context, readRequest apiModel.PlcReadRequest) <-chan apiModel.PlcReadRequestResult {
-	// TODO: handle ctx
 	m.log.Trace().Msg("Reading")
 	result := make(chan apiModel.PlcReadRequestResult, 1)
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
+	m.wg.Go(func() {
 		if len(readRequest.GetTagNames()) == 0 {
 			result <- spiModel.NewDefaultPlcReadRequestResult(readRequest, nil, errors.New("at least one field required"))
 			return
@@ -137,11 +134,13 @@ func (m *Reader) Read(ctx context.Context, readRequest apiModel.PlcReadRequest) 
 		)
 
 		// Start a new request-transaction (Is ended in the response-handler)
-		transaction := m.tm.StartTransaction()
-		transaction.Submit(func(transaction transactions.RequestTransaction) {
+		transaction := m.tm.StartTransaction("read")
+		transaction.Submit("readOperation", func(transactionContext context.Context, transaction transactions.RequestTransaction) {
+			ctx, cancel := context.WithCancel(ctx)
+			context.AfterFunc(transactionContext, cancel)
 			// Send the  over the wire
 			m.log.Trace().Msg("Send ")
-			if err := m.messageCodec.SendRequest(ctx, apdu, func(message spi.Message) bool {
+			if err := m.messageCodec.SendRequest(ctx, "read", apdu, func(message spi.Message) bool {
 				bvlc, ok := message.(readWriteModel.BVLC)
 				if !ok {
 					m.log.Debug().Type("bvlc", bvlc).Msg("Received strange type")
@@ -195,7 +194,7 @@ func (m *Reader) Read(ctx context.Context, readRequest apiModel.PlcReadRequest) 
 					errors.Wrap(err, "got timeout while waiting for response"),
 				)
 				return transaction.EndRequest()
-			}, time.Second*1); err != nil {
+			}); err != nil {
 				result <- spiModel.NewDefaultPlcReadRequestResult(
 					readRequest,
 					nil,
@@ -206,7 +205,7 @@ func (m *Reader) Read(ctx context.Context, readRequest apiModel.PlcReadRequest) 
 				}
 			}
 		})
-	}()
+	})
 	return result
 }
 

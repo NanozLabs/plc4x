@@ -22,6 +22,7 @@ package pcap
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"runtime/debug"
@@ -55,6 +56,8 @@ type TransportInstance struct {
 	handle    *pcap.Handle
 	reader    *bufio.Reader
 
+	wg sync.WaitGroup
+
 	log zerolog.Logger
 }
 
@@ -73,7 +76,7 @@ func NewPcapTransportInstance(transportFile string, transportType TransportType,
 	return transportInstance
 }
 
-func (m *TransportInstance) Connect() error {
+func (m *TransportInstance) Connect(ctx context.Context) error {
 	m.stateChangeMutex.Lock()
 	defer m.stateChangeMutex.Unlock()
 	if m.connected.Load() {
@@ -95,7 +98,7 @@ func (m *TransportInstance) Connect() error {
 	buffer := new(bytes.Buffer)
 	m.reader = bufio.NewReader(buffer)
 
-	go func(m *TransportInstance, buffer *bytes.Buffer) {
+	m.wg.Go(func() {
 		defer func() {
 			if err := recover(); err != nil {
 				m.log.Error().
@@ -106,7 +109,7 @@ func (m *TransportInstance) Connect() error {
 		}()
 		packageCount := 0
 		var lastPacketTime *time.Time
-		for m.connected.Load() {
+		for m.connected.Load() && ctx.Err() == nil {
 			packetData, captureInfo, err := m.handle.ReadPacketData()
 			packageCount++
 			m.log.Info().Int("packageCount", packageCount).Interface("captureInfo", captureInfo).Msg("Read new package (nr. packageCount)")
@@ -161,9 +164,13 @@ func (m *TransportInstance) Connect() error {
 			buffer.Write(payload)
 			lastPacketTime = &captureInfo.Timestamp
 		}
-	}(m, buffer)
+	})
 
 	return nil
+}
+
+func (m *TransportInstance) Reset() {
+	// No-Op
 }
 
 func (m *TransportInstance) Close() error {
@@ -174,6 +181,7 @@ func (m *TransportInstance) Close() error {
 		handle.Close()
 	}
 	m.connected.Store(false)
+	m.wg.Wait()
 	return nil
 }
 
@@ -181,7 +189,7 @@ func (m *TransportInstance) IsConnected() bool {
 	return m.connected.Load()
 }
 
-func (m *TransportInstance) Write(_ []byte) error {
+func (m *TransportInstance) Write(ctx context.Context, data []byte) error {
 	if !m.connected.Load() {
 		return errors.New("error writing to transport. No writer available")
 	}
@@ -190,6 +198,11 @@ func (m *TransportInstance) Write(_ []byte) error {
 
 func (m *TransportInstance) GetReader() transports.ExtendedReader {
 	return m.reader
+}
+
+func (m *TransportInstance) SetReadDeadline(deadline time.Time) error {
+	// TODO: big oof.... there is no way to set a timeout
+	return nil
 }
 
 func (m *TransportInstance) String() string {

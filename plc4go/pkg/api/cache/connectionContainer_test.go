@@ -20,6 +20,7 @@
 package cache
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -43,7 +44,7 @@ func Test_connectionContainer_String(t1 *testing.T) {
 		leaseCounter     uint32
 		closed           bool
 		state            cachedPlcConnectionState
-		queue            []chan plc4go.PlcConnectionConnectResult
+		queue            []connectionRequest
 		listeners        []connectionListener
 	}
 	tests := []struct {
@@ -90,7 +91,7 @@ func Test_connectionContainer_addListener(t1 *testing.T) {
 		leaseCounter     uint32
 		closed           bool
 		state            cachedPlcConnectionState
-		queue            []chan plc4go.PlcConnectionConnectResult
+		queue            []connectionRequest
 		listeners        []connectionListener
 	}
 	type args struct {
@@ -138,7 +139,7 @@ func Test_connectionContainer_connect(t1 *testing.T) {
 		leaseCounter     uint32
 		closed           bool
 		state            cachedPlcConnectionState
-		queue            []chan plc4go.PlcConnectionConnectResult
+		queue            []connectionRequest
 		listeners        []connectionListener
 	}
 	tests := []struct {
@@ -151,7 +152,6 @@ func Test_connectionContainer_connect(t1 *testing.T) {
 			fields: fields{
 				connectionString: "simulated://1.2.3.4:42",
 				lock:             lock.NewCASMutex(),
-				queue:            []chan plc4go.PlcConnectionConnectResult{},
 			},
 			setup: func(t *testing.T, fields *fields) {
 				logger := testutils.ProduceTestingLogger(t)
@@ -198,21 +198,26 @@ func Test_connectionContainer_lease(t1 *testing.T) {
 		leaseCounter     uint32
 		closed           bool
 		state            cachedPlcConnectionState
-		queue            []chan plc4go.PlcConnectionConnectResult
+		queue            []connectionRequest
 		listeners        []connectionListener
 	}
+	type args struct {
+		ctx context.Context
+	}
 	tests := []struct {
-		name       string
-		fields     fields
-		setup      func(t *testing.T, fields *fields)
-		wantNotNil bool
+		name   string
+		fields fields
+		args   args
+		setup  func(t *testing.T, fields *fields)
 	}{
 		{
 			name: "lease fresh",
 			fields: fields{
 				connectionString: "simulated://1.2.3.4:42",
 				lock:             lock.NewCASMutex(),
-				queue:            []chan plc4go.PlcConnectionConnectResult{},
+			},
+			args: args{
+				ctx: t1.Context(),
 			},
 			setup: func(t *testing.T, fields *fields) {
 				logger := testutils.ProduceTestingLogger(t)
@@ -224,7 +229,6 @@ func Test_connectionContainer_lease(t1 *testing.T) {
 				driverManager.RegisterDriver(simulated.NewDriver(options.WithCustomLogger(logger)))
 				fields.driverManager = driverManager
 			},
-			wantNotNil: true,
 		},
 	}
 	for _, tt := range tests {
@@ -245,7 +249,9 @@ func Test_connectionContainer_lease(t1 *testing.T) {
 				queue:            tt.fields.queue,
 				listeners:        tt.fields.listeners,
 			}
-			assert.True(t1, tt.wantNotNil, c.lease(), "lease()")
+			lease, errors := c.lease(tt.args.ctx)
+			assert.NotNil(t, lease)
+			assert.NotNil(t, errors)
 		})
 	}
 }
@@ -260,7 +266,7 @@ func Test_connectionContainer_returnConnection(t1 *testing.T) {
 		leaseCounter     uint32
 		closed           bool
 		state            cachedPlcConnectionState
-		queue            []chan plc4go.PlcConnectionConnectResult
+		queue            []connectionRequest
 		listeners        []connectionListener
 	}
 	type args struct {
@@ -278,7 +284,6 @@ func Test_connectionContainer_returnConnection(t1 *testing.T) {
 			fields: fields{
 				connectionString: "simulated://1.2.3.4:42",
 				lock:             lock.NewCASMutex(),
-				queue:            []chan plc4go.PlcConnectionConnectResult{},
 			},
 			args: args{
 				state: StateInitialized,
@@ -300,7 +305,6 @@ func Test_connectionContainer_returnConnection(t1 *testing.T) {
 			fields: fields{
 				connectionString: "simulated://1.2.3.4:42",
 				lock:             lock.NewCASMutex(),
-				queue:            []chan plc4go.PlcConnectionConnectResult{},
 			},
 			args: args{
 				state: StateInUse,

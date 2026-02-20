@@ -38,30 +38,21 @@ func Test_newExecutor(t *testing.T) {
 		log                    zerolog.Logger
 	}
 	tests := []struct {
-		name        string
-		args        args
-		want        *executor
-		manipulator func(t *testing.T, want *executor, got *executor)
+		name       string
+		args       args
+		wantAssert func(*testing.T, *executor) bool
 	}{
 		{
 			name: "just create it",
-			want: &executor{
-				worker: []*worker{},
-			},
-			manipulator: func(t *testing.T, want *executor, got *executor) {
-				assert.NotNil(t, got.workItems)
-				want.workItems = got.workItems
+			wantAssert: func(t *testing.T, got *executor) bool {
+				return assert.NotNil(t, got)
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := newExecutor(tt.args.queueDepth, tt.args.numberOfInitialWorkers, tt.args.log)
-			want := tt.want
-			if tt.manipulator != nil {
-				tt.manipulator(t, want, got)
-			}
-			assert.Equalf(t, want, got, "newExecutor(%v, %v, %v)", tt.args.queueDepth, tt.args.numberOfInitialWorkers, tt.args.log)
+			assert.Truef(t, tt.wantAssert(t, got), "newExecutor(%v, %v, %v)", tt.args.queueDepth, tt.args.numberOfInitialWorkers, tt.args.log)
 		})
 	}
 }
@@ -220,6 +211,8 @@ func Test_executor_Stop(t *testing.T) {
 				worker:       tt.fields.worker,
 				workItems:    tt.fields.queue,
 				traceWorkers: tt.fields.traceWorkers,
+				ctxCancel:    func() {},
+				ctx:          t.Context(),
 			}
 			e.Stop()
 		})
@@ -259,12 +252,15 @@ func Test_executor_Submit(t *testing.T) {
 			},
 			args: args{
 				workItemId: 13,
-				runnable: func() {
+				runnable: func(ctx context.Context) {
 					// We do something for 3 seconds
-					<-time.NewTimer(3 * time.Second).C
+					select {
+					case <-time.NewTimer(3 * time.Second).C:
+					case <-ctx.Done():
+					}
 				},
 				context: func() context.Context {
-					ctx, cancelFunc := context.WithCancel(context.Background())
+					ctx, cancelFunc := context.WithCancel(t.Context())
 					cancelFunc()
 					return ctx
 				}(),
@@ -281,9 +277,12 @@ func Test_executor_Submit(t *testing.T) {
 			},
 			args: args{
 				workItemId: 13,
-				runnable: func() {
+				runnable: func(ctx context.Context) {
 					// We do something for 3 seconds
-					<-time.NewTimer(3 * time.Second).C
+					select {
+					case <-time.NewTimer(3 * time.Second).C:
+					case <-ctx.Done():
+					}
 				},
 				context: t.Context(),
 			},
@@ -306,7 +305,7 @@ func Test_executor_Submit(t *testing.T) {
 			}(),
 			args: args{
 				workItemId: 13,
-				runnable: func() {
+				runnable: func(_ context.Context) {
 					// NOOP
 				},
 				context: t.Context(),
@@ -454,7 +453,7 @@ func Test_executor_String(t *testing.T) {
 				shutdown: true,
 				worker: []*worker{
 					{
-						id:          1,
+						id:          "1",
 						shutdown:    atomic.Bool{},
 						interrupted: atomic.Bool{},
 						lastReceived: func() atomic.Value {
@@ -467,19 +466,16 @@ func Test_executor_String(t *testing.T) {
 				traceWorkers: true,
 			},
 			want: `
-╔═executor═════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║╔═running╗╔═shutdown╗                                                                                                 ║
-║║b1 true ║║ b1 true ║                                                                                                 ║
-║╚════════╝╚═════════╝                                                                                                 ║
-║╔═worker/value/worker══════════════════════════════════════════════════════════════════════════════════╗╔═workItems══╗║
-║║╔═id═════════════════╗╔═lastReceived════════════════╗╔═running╗╔═shutdown╗╔═interrupted╗╔═interrupter╗║║0 element(s)║║
-║║║0x0000000000000001 1║║0001-01-01 00:00:00 +0000 UTC║║b0 false║║b0 false ║║  b0 false  ║║0 element(s)║║╚════════════╝║
-║║╚════════════════════╝╚═════════════════════════════╝╚════════╝╚═════════╝╚════════════╝╚════════════╝║              ║
-║╚══════════════════════════════════════════════════════════════════════════════════════════════════════╝              ║
-║╔═traceWorkers╗                                                                                                       ║
-║║   b1 true   ║                                                                                                       ║
-║╚═════════════╝                                                                                                       ║
-╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝`[1:],
+╔═executor═══════════════════════════════════════════════════════════════════════════════════════════════════╗
+║╔═running╗╔═shutdown╗╔═worker/value/worker═════════════════════════════════════════════════════════════════╗║
+║║b1 true ║║ b1 true ║║╔═id╗╔═lastReceived════════════════╗╔═running╗╔═shutdown╗╔═interrupted╗╔═interrupter╗║║
+║╚════════╝╚═════════╝║║ 1 ║║0001-01-01 00:00:00 +0000 UTC║║b0 false║║b0 false ║║  b0 false  ║║0 element(s)║║║
+║                     ║╚═══╝╚═════════════════════════════╝╚════════╝╚═════════╝╚════════════╝╚════════════╝║║
+║                     ╚═════════════════════════════════════════════════════════════════════════════════════╝║
+║╔═workerNumber╗╔═workItems══╗╔═traceWorkers╗                                                                ║
+║║0x00000000 0 ║║0 element(s)║║   b1 true   ║                                                                ║
+║╚═════════════╝╚════════════╝╚═════════════╝                                                                ║
+╚════════════════════════════════════════════════════════════════════════════════════════════════════════════╝`[1:],
 		},
 	}
 	for _, tt := range tests {

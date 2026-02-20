@@ -21,13 +21,14 @@ package modbus
 
 import (
 	"context"
+	"encoding/base64"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/apache/plc4x/plc4go/protocols/modbus/readwrite/model"
 	"github.com/apache/plc4x/plc4go/spi"
-	"github.com/apache/plc4x/plc4go/spi/default"
+	_default "github.com/apache/plc4x/plc4go/spi/default"
 	"github.com/apache/plc4x/plc4go/spi/options"
 	"github.com/apache/plc4x/plc4go/spi/transports"
 )
@@ -35,12 +36,17 @@ import (
 //go:generate go tool plc4xGenerator -type=MessageCodec
 type MessageCodec struct {
 	_default.DefaultCodec
+
 	expectationCounter int32
 
 	passLogToModel bool
 
 	log zerolog.Logger
 }
+
+var (
+	_ spi.TransportInstanceExposer = (*MessageCodec)(nil)
+)
 
 func NewMessageCodec(transportInstance transports.TransportInstance, _options ...options.WithOption) *MessageCodec {
 	passLoggerToModel, _ := options.ExtractPassLoggerToModel(_options...)
@@ -50,7 +56,7 @@ func NewMessageCodec(transportInstance transports.TransportInstance, _options ..
 		passLogToModel:     passLoggerToModel,
 		log:                customLogger,
 	}
-	codec.DefaultCodec = _default.NewDefaultCodec(codec, transportInstance)
+	codec.DefaultCodec = _default.NewDefaultCodec(codec, transportInstance, _options...)
 	return codec
 }
 
@@ -58,8 +64,8 @@ func (m *MessageCodec) GetCodec() spi.MessageCodec {
 	return m
 }
 
-func (m *MessageCodec) Send(message spi.Message) error {
-	m.log.Trace().Msg("Sending message")
+func (m *MessageCodec) Send(ctx context.Context, interactionInfo string, message spi.Message) error {
+	m.log.Trace().Str("interactionInfo", interactionInfo).Msg("Sending message")
 	// Cast the message to the correct type of struct
 	tcpAdu := message.(model.ModbusTcpADU)
 	// Serialize the request
@@ -69,18 +75,36 @@ func (m *MessageCodec) Send(message spi.Message) error {
 	}
 
 	// Send it to the PLC
-	err = m.GetTransportInstance().Write(theBytes)
+	err = m.GetTransportInstance().Write(ctx, theBytes)
 	if err != nil {
 		return errors.Wrap(err, "error sending request")
 	}
 	return nil
 }
 
-func (m *MessageCodec) Receive() (spi.Message, error) {
+func (m *MessageCodec) Receive(ctx context.Context) (spi.Message, error) {
+	ti := m.GetTransportInstance()
+	if !ti.IsConnected() {
+		return nil, errors.New("Transport instance not connected")
+	}
+
+	if err := ti.FillBuffer(ctx, func(pos uint, currentByte byte, reader transports.ExtendedReader) bool {
+		m.log.Trace().Uint("pos", pos).Uint8("currentByte", currentByte).Msg("filling")
+		numBytesAvailable, err := ti.GetNumBytesAvailableInBuffer()
+		if err != nil {
+			m.log.Debug().Err(err).Msg("error getting available bytes")
+			return false
+		}
+		m.log.Trace().Uint32("numBytesAvailable", numBytesAvailable).Msg("check available bytes < 6")
+		return numBytesAvailable < 6
+	}); err != nil {
+		m.log.Debug().Err(err).Msg("error filling buffer")
+	}
+
 	// We need at least 6 bytes in order to know how big the packet is in total
-	if num, err := m.GetTransportInstance().GetNumBytesAvailableInBuffer(); (err == nil) && (num >= 6) {
+	if num, err := ti.GetNumBytesAvailableInBuffer(); (err == nil) && (num >= 6) {
 		m.log.Debug().Uint32("num", num).Msg("we got num readable bytes")
-		data, err := m.GetTransportInstance().PeekReadableBytes(6)
+		data, err := ti.PeekReadableBytes(ctx, 6)
 		if err != nil {
 			m.log.Warn().Err(err).Msg("error peeking")
 			// TODO: Possibly clean up ...
@@ -94,15 +118,19 @@ func (m *MessageCodec) Receive() (spi.Message, error) {
 				Uint32("packetSize", packetSize).Msg("Not enough bytes. Got: num Need: packetSize")
 			return nil, nil
 		}
-		data, err = m.GetTransportInstance().Read(packetSize)
+		data, err = ti.Read(ctx, packetSize)
 		if err != nil {
 			// TODO: Possibly clean up ...
 			return nil, nil
 		}
-		ctxForModel := options.GetLoggerContextForModel(context.Background(), m.log, options.WithPassLoggerToModel(m.passLogToModel))
+		ctxForModel := options.GetLoggerContextForModel(ctx, m.log, options.WithPassLoggerToModel(m.passLogToModel))
 		tcpAdu, err := model.ModbusADUParse[model.ModbusTcpADU](ctxForModel, data, model.DriverType_MODBUS_TCP, true)
 		if err != nil {
-			m.log.Warn().Err(err).Msg("error parsing")
+			dataStr := base64.StdEncoding.EncodeToString(data)
+			m.log.Warn().Err(err).
+				Str("data", dataStr). // Max PDU size is 253 bytes, and catching parse errors for inspection is important
+				Uint32("packetSize", packetSize).
+				Msg("error parsing")
 			// TODO: Possibly clean up ...
 			return nil, nil
 		}

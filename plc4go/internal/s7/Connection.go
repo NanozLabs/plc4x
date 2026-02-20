@@ -22,7 +22,6 @@ package s7
 import (
 	"context"
 	"fmt"
-	"runtime/debug"
 	"strings"
 	"sync"
 
@@ -60,6 +59,7 @@ func (t *TpduGenerator) getAndIncrement() uint16 {
 
 type Connection struct {
 	_default.DefaultConnection
+
 	tpduGenerator TpduGenerator
 	messageCodec  spi.MessageCodec
 	configuration Configuration
@@ -74,6 +74,10 @@ type Connection struct {
 	log      zerolog.Logger
 	_options []options.WithOption // Used to pass them downstream
 }
+
+var (
+	_ spi.TransportInstanceExposer = (*Connection)(nil)
+)
 
 func NewConnection(messageCodec spi.MessageCodec, configuration Configuration, driverContext DriverContext, tagHandler spi.PlcTagHandler, tm transactions.RequestTransactionManager, connectionOptions map[string][]string, _options ...options.WithOption) *Connection {
 	customLogger := options.ExtractCustomLoggerOrDefaultToGlobal(_options...)
@@ -118,54 +122,48 @@ func (c *Connection) GetMessageCodec() spi.MessageCodec {
 	return c.messageCodec
 }
 
-func (c *Connection) ConnectWithContext(ctx context.Context) <-chan plc4go.PlcConnectionConnectResult {
+func (c *Connection) Connect(ctx context.Context) error {
 	c.log.Trace().Msg("Connecting")
-	ch := make(chan plc4go.PlcConnectionConnectResult, 1)
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
-		defer func() {
-			if err := recover(); err != nil {
-				ch <- _default.NewDefaultPlcConnectionConnectResult(nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack()))
+	err := c.messageCodec.Connect(ctx)
+	if err != nil {
+		return errors.Wrap(err, "Error during message codec setup")
+	}
+
+	// Only on active connections we do a connection
+	if c.driverContext.PassiveMode {
+		c.log.Info().Msg("S7 Driver running in PASSIVE mode.")
+		return nil
+	}
+
+	// For testing purposes we can skip the waiting for a complete connection
+	if !c.driverContext.awaitSetupComplete {
+		c.wg.Go(func() {
+			if err := c.setupConnection(ctx); err != nil {
+				c.log.Error().Err(err).Msg("Error during connection setup")
 			}
-		}()
-		err := c.messageCodec.ConnectWithContext(ctx)
-		if err != nil {
-			ch <- _default.NewDefaultPlcConnectionConnectResult(c, err)
-		}
+		})
+		c.log.Warn().Msg("Connection used in an unsafe way. !!!DON'T USE IN PRODUCTION!!!")
+		// Here we write directly and don't wait till the connection is "really" connected
+		// Note: we can't use fireConnected here as it's guarded against c.driverContext.awaitSetupComplete
+		c.SetConnected(true)
+		return nil
+	}
 
-		// Only on active connections we do a connection
-		if c.driverContext.PassiveMode {
-			c.log.Info().Msg("S7 Driver running in PASSIVE mode.")
-			ch <- _default.NewDefaultPlcConnectionConnectResult(c, nil)
-			return
-		}
+	// Only the TCP transport supports login.
+	c.log.Info().Msg("S7 Driver running in ACTIVE mode.")
 
-		// For testing purposes we can skip the waiting for a complete connection
-		if !c.driverContext.awaitSetupComplete {
-			go c.setupConnection(ctx, ch)
-			c.log.Warn().Msg("Connection used in an unsafe way. !!!DON'T USE IN PRODUCTION!!!")
-			// Here we write directly and don't wait till the connection is "really" connected
-			// Note: we can't use fireConnected here as it's guarded against c.driverContext.awaitSetupComplete
-			ch <- _default.NewDefaultPlcConnectionConnectResult(c, err)
-			c.SetConnected(true)
-			return
-		}
-
-		// Only the TCP transport supports login.
-		c.log.Info().Msg("S7 Driver running in ACTIVE mode.")
-
-		c.setupConnection(ctx, ch)
-	}()
-	return ch
+	if err := c.setupConnection(ctx); err != nil {
+		return errors.Wrap(err, "Error during connection setup")
+	}
+	return nil
 }
 
-func (c *Connection) setupConnection(ctx context.Context, ch chan plc4go.PlcConnectionConnectResult) {
+func (c *Connection) setupConnection(ctx context.Context) error {
 	c.log.Debug().Msg("Sending COTP Connection Request")
 	// Open the session on ISO Transport Protocol first.
 	cotpConnectionResult := make(chan readWriteModel.COTPPacketConnectionResponse, 1)
 	cotpConnectionErrorChan := make(chan error, 1)
-	if err := c.messageCodec.SendRequest(ctx, readWriteModel.NewTPKTPacket(c.createCOTPConnectionRequest()), func(message spi.Message) bool {
+	if err := c.messageCodec.SendRequest(ctx, "setup_connection", readWriteModel.NewTPKTPacket(c.createCOTPConnectionRequest()), func(message spi.Message) bool {
 		tpktPacket := message.(readWriteModel.TPKTPacket)
 		if tpktPacket == nil {
 			return false
@@ -186,8 +184,8 @@ func (c *Connection) setupConnection(ctx context.Context, ch chan plc4go.PlcConn
 		}
 		cotpConnectionErrorChan <- errors.Wrap(err, "got error processing request")
 		return nil
-	}, c.GetTtl()); err != nil {
-		c.fireConnectionError(errors.Wrap(err, "Error during sending of COTP Connection Request"), ch)
+	}); err != nil {
+		return errors.Wrap(err, "Error during sending of COTP Connection Request")
 	}
 	select {
 	case cotpPacketConnectionResponse := <-cotpConnectionResult:
@@ -197,7 +195,7 @@ func (c *Connection) setupConnection(ctx context.Context, ch chan plc4go.PlcConn
 		// Send an S7 login message.
 		s7ConnectionResult := make(chan readWriteModel.S7ParameterSetupCommunication, 1)
 		s7ConnectionErrorChan := make(chan error, 1)
-		if err := c.messageCodec.SendRequest(ctx, c.createS7ConnectionRequest(cotpPacketConnectionResponse), func(message spi.Message) bool {
+		if err := c.messageCodec.SendRequest(ctx, "setup_connection_connection_request", c.createS7ConnectionRequest(cotpPacketConnectionResponse), func(message spi.Message) bool {
 			tpktPacket, ok := message.(readWriteModel.TPKTPacket)
 			if !ok {
 				return false
@@ -224,12 +222,14 @@ func (c *Connection) setupConnection(ctx context.Context, ch chan plc4go.PlcConn
 			var timeoutError utils.TimeoutError
 			if errors.As(err, &timeoutError) {
 				c.log.Warn().Msg("Timeout during Connection establishing, closing channel...")
-				c.Close()
+				if err := c.Close(); err != nil {
+					c.log.Error().Err(err).Msg("Error during closing of connection")
+				}
 			}
 			s7ConnectionErrorChan <- errors.Wrap(err, "got error processing request")
 			return nil
-		}, c.GetTtl()); err != nil {
-			c.fireConnectionError(errors.Wrap(err, "Error during sending of S7 Connection Request"), ch)
+		}); err != nil {
+			return errors.Wrap(err, "Error during sending of S7 Connection Request")
 		}
 		select {
 		case setupCommunication := <-s7ConnectionResult:
@@ -251,15 +251,15 @@ func (c *Connection) setupConnection(ctx context.Context, ch chan plc4go.PlcConn
 			// in order to detect the type of PLC.
 			if c.driverContext.ControllerType != ControllerType_ANY {
 				// Send an event that connection setup is complete.
-				c.fireConnected(ch)
-				return
+				c.SetConnected(true)
+				return nil
 			}
 
 			// Prepare a message to request the remote to identify itself.
 			c.log.Debug().Msg("Sending S7 Identification Request")
 			s7IdentificationResult := make(chan readWriteModel.S7PayloadUserData, 1)
 			s7IdentificationErrorChan := make(chan error, 1)
-			if err := c.messageCodec.SendRequest(ctx, c.createIdentifyRemoteMessage(), func(message spi.Message) bool {
+			if err := c.messageCodec.SendRequest(ctx, "setup_connection_identify_remote_message", c.createIdentifyRemoteMessage(), func(message spi.Message) bool {
 				tpktPacket, ok := message.(readWriteModel.TPKTPacket)
 				if !ok {
 					return false
@@ -289,42 +289,28 @@ func (c *Connection) setupConnection(ctx context.Context, ch chan plc4go.PlcConn
 				}
 				s7IdentificationErrorChan <- errors.Wrap(err, "got error processing request")
 				return nil
-			}, c.GetTtl()); err != nil {
-				c.fireConnectionError(errors.Wrap(err, "Error during sending of identify remote Request"), ch)
+			}); err != nil {
+				return errors.Wrap(err, "Error during sending of identify remote Request")
 			}
 			select {
 			case payloadUserData := <-s7IdentificationResult:
 				c.log.Debug().Msg("Got S7 Identification Response")
-				c.extractControllerTypeAndFireConnected(payloadUserData, ch)
+				if err := c.extractControllerTypeAndFireConnected(payloadUserData); err != nil {
+					return errors.Wrap(err, "Error extracting controller type")
+				}
 			case err := <-s7IdentificationErrorChan:
-				c.fireConnectionError(errors.Wrap(err, "Error receiving identify remote Request"), ch)
+				return errors.Wrap(err, "Error receiving identify remote Request")
 			}
 		case err := <-s7ConnectionErrorChan:
-			c.fireConnectionError(errors.Wrap(err, "Error receiving S7 Connection Request"), ch)
+			return errors.Wrap(err, "Error receiving S7 Connection Request")
 		}
 	case err := <-cotpConnectionErrorChan:
-		c.fireConnectionError(errors.Wrap(err, "Error receiving of COTP Connection Request"), ch)
+		return errors.Wrap(err, "Error receiving of COTP Connection Request")
 	}
+	return nil
 }
 
-func (c *Connection) fireConnectionError(err error, ch chan<- plc4go.PlcConnectionConnectResult) {
-	if c.driverContext.awaitSetupComplete {
-		ch <- _default.NewDefaultPlcConnectionConnectResult(nil, errors.Wrap(err, "Error during connection"))
-	} else {
-		c.log.Error().Err(err).Msg("awaitSetupComplete set to false and we got a error during connect")
-	}
-}
-
-func (c *Connection) fireConnected(ch chan<- plc4go.PlcConnectionConnectResult) {
-	if c.driverContext.awaitSetupComplete {
-		ch <- _default.NewDefaultPlcConnectionConnectResult(c, nil)
-	} else {
-		c.log.Info().Msg("Successfully connected")
-	}
-	c.SetConnected(true)
-}
-
-func (c *Connection) extractControllerTypeAndFireConnected(payloadUserData readWriteModel.S7PayloadUserData, ch chan<- plc4go.PlcConnectionConnectResult) {
+func (c *Connection) extractControllerTypeAndFireConnected(payloadUserData readWriteModel.S7PayloadUserData) error {
 	// TODO: how do we handle the case if there no items at all? Should we assume it a successful or failure...
 	// TODO ... opposed to the java implementation we treat it as a failure
 	for _, item := range payloadUserData.GetItems() {
@@ -361,12 +347,12 @@ func (c *Connection) extractControllerTypeAndFireConnected(payloadUserData readW
 				c.driverContext.ControllerType = controllerType
 
 				// Send an event that connection setup is complete.
-				c.fireConnected(ch)
-				return
+				c.SetConnected(true)
+				return nil
 			}
 		}
 	}
-	c.fireConnectionError(errors.New("Coudln't find the required information"), ch)
+	return errors.New("Coudln't find the required information")
 }
 
 func (c *Connection) createIdentifyRemoteMessage() readWriteModel.TPKTPacket {

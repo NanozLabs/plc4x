@@ -94,6 +94,7 @@ type TestTransportInstance interface {
 }
 
 func (m DriverTestsuite) Run(t *testing.T, driverManager plc4go.PlcDriverManager, testcase DriverTestcase) error {
+	ctx := t.Context()
 	var driverParameters []string
 	for key, value := range m.driverParameters {
 		driverParameters = append(driverParameters, fmt.Sprintf("%s=%s", key, value))
@@ -104,27 +105,12 @@ func (m DriverTestsuite) Run(t *testing.T, driverManager plc4go.PlcDriverManager
 	}
 	// Get a connection
 	t.Log("getting a connection")
-	connectionChan := driverManager.GetConnection(m.driverName + ":test://hurz" + optionsString)
-	timer := time.NewTimer(DriverTestsuiteConnectTimeout)
-	var connectionResult plc4go.PlcConnectionConnectResult
-	select {
-	case connectionResult = <-connectionChan:
-	case <-timer.C:
-		t.Fatalf("timeout")
+	connection, err := driverManager.GetConnection(ctx, m.driverName+":test://hurz"+optionsString)
+	if err != nil {
+		return errors.Wrap(err, "error getting a connection")
 	}
-
-	if connectionResult.GetErr() != nil {
-		return errors.Wrap(connectionResult.GetErr(), "error getting a connection")
-	}
-	connection := connectionResult.GetConnection()
 	t.Cleanup(func() {
-		timeout := time.NewTimer(30 * time.Second)
-		select {
-		case result := <-connection.Close():
-			assert.NoError(t, result.GetErr())
-		case <-timeout.C:
-			t.Error("timeout closing connection")
-		}
+		t.Log("Close result", connection.Close())
 	})
 	utils.NewAsciiBoxWriter()
 	m.LogDelimiterSection(t, "=", "Executing testcase: %s", testcase.name)
@@ -180,6 +166,7 @@ func (m DriverTestsuite) Run(t *testing.T, driverManager plc4go.PlcDriverManager
 }
 
 func (m DriverTestsuite) ExecuteStep(t *testing.T, connection plc4go.PlcConnection, testcase *DriverTestcase, step DriverTestStep) error {
+	ctx := t.Context()
 	mc, ok := connection.(spi.TransportInstanceExposer)
 	if !ok {
 		return errors.New("couldn't access connections transport instance")
@@ -213,7 +200,7 @@ func (m DriverTestsuite) ExecuteStep(t *testing.T, connection plc4go.PlcConnecti
 			if testcase.readRequestResultChannel != nil {
 				return errors.New("testcase read-request result channel already occupied")
 			}
-			testcase.readRequestResultChannel = readRequest.Execute()
+			testcase.readRequestResultChannel = readRequest.Execute(ctx)
 			t.Log("request executed")
 		case "TestWriteRequest":
 			t.Log("Assemble write request")
@@ -249,7 +236,7 @@ func (m DriverTestsuite) ExecuteStep(t *testing.T, connection plc4go.PlcConnecti
 			if testcase.writeRequestResultChannel != nil {
 				return errors.New("testcase write-request result channel already occupied")
 			}
-			testcase.writeRequestResultChannel = writeRequest.Execute()
+			testcase.writeRequestResultChannel = writeRequest.Execute(ctx)
 			t.Log("request executed")
 		}
 	case StepTypeApiResponse:
@@ -267,7 +254,7 @@ func (m DriverTestsuite) ExecuteStep(t *testing.T, connection plc4go.PlcConnecti
 			xmlWriteBuffer := utils.NewXmlWriteBuffer()
 			response := readRequestResult.GetResponse()
 			t.Logf("Got response (%T)\n%[1]s", response)
-			err := response.(utils.Serializable).SerializeWithWriteBuffer(context.Background(), xmlWriteBuffer)
+			err := response.(utils.Serializable).SerializeWithWriteBuffer(ctx, xmlWriteBuffer)
 			if err != nil {
 				return errors.Wrap(err, "error serializing response")
 			}
@@ -294,7 +281,7 @@ func (m DriverTestsuite) ExecuteStep(t *testing.T, connection plc4go.PlcConnecti
 			xmlWriteBuffer := utils.NewXmlWriteBuffer()
 			response := writeResponseResult.GetResponse()
 			t.Logf("Got response (%T)\n%[1]s", response)
-			err := response.(utils.Serializable).SerializeWithWriteBuffer(context.Background(), xmlWriteBuffer)
+			err := response.(utils.Serializable).SerializeWithWriteBuffer(ctx, xmlWriteBuffer)
 			if err != nil {
 				return errors.Wrap(err, "error serializing response")
 			}
@@ -334,7 +321,7 @@ func (m DriverTestsuite) ExecuteStep(t *testing.T, connection plc4go.PlcConnecti
 			t.Log("using little endian")
 			expectedWriteBuffer = utils.NewWriteBufferByteBased(utils.WithByteOrderForByteBasedBuffer(binary.LittleEndian))
 		}
-		err = expectedSerializable.SerializeWithWriteBuffer(context.Background(), expectedWriteBuffer)
+		err = expectedSerializable.SerializeWithWriteBuffer(ctx, expectedWriteBuffer)
 		if err != nil {
 			return errors.Wrap(err, "error serializing expectedMessage")
 		}

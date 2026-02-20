@@ -40,9 +40,13 @@ type MessageCodec struct {
 	log            zerolog.Logger
 }
 
-func NewMessageCodec(transportInstance transports.TransportInstance) *MessageCodec {
+var (
+	_ spi.TransportInstanceExposer = (*MessageCodec)(nil)
+)
+
+func NewMessageCodec(transportInstance transports.TransportInstance, _options ...options.WithOption) *MessageCodec {
 	codec := &MessageCodec{}
-	codec.DefaultCodec = _default.NewDefaultCodec(codec, transportInstance, _default.WithCustomMessageHandler(codec.handleCustomMessage))
+	codec.DefaultCodec = _default.NewDefaultCodec(codec, transportInstance, append(_options, _default.WithCustomMessageHandler(codec.handleCustomMessage))...)
 	return codec
 }
 
@@ -50,8 +54,8 @@ func (m *MessageCodec) GetCodec() spi.MessageCodec {
 	return m
 }
 
-func (m *MessageCodec) Send(message spi.Message) error {
-	m.log.Trace().Msg("Sending message")
+func (m *MessageCodec) Send(ctx context.Context, interactionInfo string, message spi.Message) error {
+	m.log.Trace().Str("interactionInfo", interactionInfo).Msg("Sending message")
 	// Cast the message to the correct type of struct
 	bvlcPacket := message.(model.BVLC)
 	// Serialize the request
@@ -61,18 +65,18 @@ func (m *MessageCodec) Send(message spi.Message) error {
 	}
 
 	// Send it to the PLC
-	err = m.GetTransportInstance().Write(theBytes)
+	err = m.GetTransportInstance().Write(ctx, theBytes)
 	if err != nil {
 		return errors.Wrap(err, "error sending request")
 	}
 	return nil
 }
 
-func (m *MessageCodec) Receive() (spi.Message, error) {
+func (m *MessageCodec) Receive(ctx context.Context) (spi.Message, error) {
 	// We need at least 6 bytes in order to know how big the packet is in total
 	if num, err := m.GetTransportInstance().GetNumBytesAvailableInBuffer(); (err == nil) && (num >= 4) {
 		m.log.Debug().Uint32("num", num).Msg("we got num readable bytes")
-		data, err := m.GetTransportInstance().PeekReadableBytes(4)
+		data, err := m.GetTransportInstance().PeekReadableBytes(ctx, 4)
 		if err != nil {
 			m.log.Warn().Err(err).Msg("error peeking")
 			// TODO: Possibly clean up ...
@@ -86,13 +90,13 @@ func (m *MessageCodec) Receive() (spi.Message, error) {
 				Msg("Not enough bytes. Got: num Need: packetSize")
 			return nil, nil
 		}
-		data, err = m.GetTransportInstance().Read(packetSize)
+		data, err = m.GetTransportInstance().Read(ctx, packetSize)
 		if err != nil {
 			m.log.Debug().Err(err).Msg("Error reading")
 			// TODO: Possibly clean up ...
 			return nil, nil
 		}
-		ctxForModel := options.GetLoggerContextForModel(context.TODO(), m.log, options.WithPassLoggerToModel(m.passLogToModel))
+		ctxForModel := options.GetLoggerContextForModel(ctx, m.log, options.WithPassLoggerToModel(m.passLogToModel))
 		bvlcPacket, err := model.BVLCParse[model.BVLC](ctxForModel, data)
 		if err != nil {
 			m.log.Warn().Err(err).Msg("error parsing")
@@ -108,8 +112,11 @@ func (m *MessageCodec) Receive() (spi.Message, error) {
 	return nil, nil
 }
 
-func (m *MessageCodec) handleCustomMessage(_ _default.DefaultCodecRequirements, message spi.Message) bool {
+func (m *MessageCodec) handleCustomMessage(ctx context.Context, _ _default.DefaultCodecRequirements, message spi.Message) bool {
 	// For now, we just put them in the incoming channel
-	m.GetDefaultIncomingMessageChannel() <- message
+	select {
+	case m.GetDefaultIncomingMessageChannel() <- message:
+	case <-ctx.Done():
+	}
 	return true
 }

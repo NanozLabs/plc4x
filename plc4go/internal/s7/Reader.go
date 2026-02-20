@@ -65,9 +65,7 @@ func (m *Reader) Read(ctx context.Context, readRequest apiModel.PlcReadRequest) 
 	// TODO: handle ctx
 	m.log.Trace().Msg("Reading")
 	result := make(chan apiModel.PlcReadRequestResult, 1)
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
+	m.wg.Go(func() {
 		defer func() {
 			if err := recover(); err != nil {
 				result <- spiModel.NewDefaultPlcReadRequestResult(readRequest, nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack()))
@@ -115,12 +113,14 @@ func (m *Reader) Read(ctx context.Context, readRequest apiModel.PlcReadRequest) 
 			),
 		)
 		// Start a new request-transaction (Is ended in the response-handler)
-		transaction := m.tm.StartTransaction()
-		transaction.Submit(func(transaction transactions.RequestTransaction) {
+		transaction := m.tm.StartTransaction("read")
+		transaction.Submit("readOperation", func(transactionContext context.Context, transaction transactions.RequestTransaction) {
+			ctx, cancel := context.WithCancel(ctx)
+			context.AfterFunc(transactionContext, cancel)
 
 			// Send the  over the wire
 			m.log.Trace().Msg("Send ")
-			if err := m.messageCodec.SendRequest(ctx, tpktPacket, func(message spi.Message) bool {
+			if err := m.messageCodec.SendRequest(ctx, "read", tpktPacket, func(message spi.Message) bool {
 				tpktPacket, ok := message.(readWriteModel.TPKTPacket)
 				if !ok {
 					return false
@@ -165,7 +165,7 @@ func (m *Reader) Read(ctx context.Context, readRequest apiModel.PlcReadRequest) 
 					errors.Wrap(err, "got timeout while waiting for response"),
 				)
 				return transaction.EndRequest()
-			}, time.Second*1); err != nil {
+			}); err != nil {
 				result <- spiModel.NewDefaultPlcReadRequestResult(
 					readRequest,
 					nil,
@@ -176,11 +176,12 @@ func (m *Reader) Read(ctx context.Context, readRequest apiModel.PlcReadRequest) 
 				}
 			}
 		})
-	}()
+	})
 	return result
 }
 
 func (m *Reader) ToPlc4xReadResponse(response readWriteModel.S7Message, readRequest apiModel.PlcReadRequest) (apiModel.PlcReadResponse, error) {
+	ctx := context.TODO()
 	var errorClass uint8
 	var errorCode uint8
 	switch messageResponseData := response.(type) {
@@ -244,7 +245,7 @@ func (m *Reader) ToPlc4xReadResponse(response readWriteModel.S7Message, readRequ
 		m.log.Trace().Msg("decode data")
 		responseCodes[tagName] = responseCode
 		if responseCode == apiModel.PlcResponseCode_OK {
-			ctxForModel := options.GetLoggerContextForModel(context.Background(), m.log, options.WithPassLoggerToModel(m.passLogToModel))
+			ctxForModel := options.GetLoggerContextForModel(ctx, m.log, options.WithPassLoggerToModel(m.passLogToModel))
 			plcValue, err := parsePlcValue(ctxForModel, tag, payloadItem.GetData())
 			if err != nil {
 				return nil, errors.Wrap(err, "Error parsing data item")

@@ -26,6 +26,7 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -54,6 +55,8 @@ type TransportInstance struct {
 	log zerolog.Logger
 }
 
+var _ transports.TransportInstance = (*TransportInstance)(nil)
+
 func NewTcpTransportInstance(remoteAddress *net.TCPAddr, connectTimeout uint32, transport *Transport, _options ...options.WithOption) *TransportInstance {
 	customLogger := options.ExtractCustomLoggerOrDefaultToGlobal(_options...)
 	transportInstance := &TransportInstance{
@@ -67,11 +70,7 @@ func NewTcpTransportInstance(remoteAddress *net.TCPAddr, connectTimeout uint32, 
 	return transportInstance
 }
 
-func (m *TransportInstance) Connect() error {
-	return m.ConnectWithContext(context.Background())
-}
-
-func (m *TransportInstance) ConnectWithContext(ctx context.Context) error {
+func (m *TransportInstance) Connect(ctx context.Context) error {
 	if m.connected.Load() {
 		return errors.New("already connected")
 	}
@@ -95,6 +94,17 @@ func (m *TransportInstance) ConnectWithContext(ctx context.Context) error {
 	return nil
 }
 
+func (m *TransportInstance) Reset() {
+	if m.tcpConn == nil {
+		m.log.Trace().Msg("No connection to reset")
+		return
+	}
+	_ = m.tcpConn.SetReadDeadline(time.Now().Add(1))
+	_, _ = m.tcpConn.Read(make([]byte, 4096))
+	m.reader = bufio.NewReader(m.tcpConn)
+	m.log.Trace().Msg("Connection reset")
+}
+
 func (m *TransportInstance) Close() error {
 	defer utils.StopWarn(m.log)()
 	m.stateChangeMutex.Lock()
@@ -113,9 +123,15 @@ func (m *TransportInstance) IsConnected() bool {
 	return m.connected.Load()
 }
 
-func (m *TransportInstance) Write(data []byte) error {
+func (m *TransportInstance) Write(ctx context.Context, data []byte) error {
 	if !m.connected.Load() {
 		return errors.New("error writing to transport. Not connected")
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		m.log.Trace().Time("deadline", deadline).Msg("deadline set")
+		if err := m.tcpConn.SetReadDeadline(deadline); err != nil {
+			return errors.Wrap(err, "error setting read deadline")
+		}
 	}
 	num, err := m.tcpConn.Write(data)
 	if err != nil {
@@ -129,6 +145,10 @@ func (m *TransportInstance) Write(data []byte) error {
 
 func (m *TransportInstance) GetReader() transports.ExtendedReader {
 	return m.reader
+}
+
+func (m *TransportInstance) SetReadDeadline(deadline time.Time) error {
+	return m.tcpConn.SetDeadline(deadline)
 }
 
 func (m *TransportInstance) String() string {

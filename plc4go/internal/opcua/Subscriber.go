@@ -62,13 +62,13 @@ func NewSubscriber(addSubscriber func(subscriber *Subscriber), connection *Conne
 	}
 }
 
-func (s *Subscriber) Subscribe(_ context.Context, subscriptionRequest apiModel.PlcSubscriptionRequest) <-chan apiModel.PlcSubscriptionRequestResult {
+func (s *Subscriber) Subscribe(ctx context.Context, subscriptionRequest apiModel.PlcSubscriptionRequest) <-chan apiModel.PlcSubscriptionRequestResult {
 	result := make(chan apiModel.PlcSubscriptionRequestResult, 1)
-	go s.subscribeSync(result, subscriptionRequest)
+	go s.subscribeSync(ctx, result, subscriptionRequest)
 	return result
 }
 
-func (s *Subscriber) subscribeSync(result chan apiModel.PlcSubscriptionRequestResult, subscriptionRequest apiModel.PlcSubscriptionRequest) {
+func (s *Subscriber) subscribeSync(ctx context.Context, result chan apiModel.PlcSubscriptionRequestResult, subscriptionRequest apiModel.PlcSubscriptionRequest) {
 	defer func() {
 		if err := recover(); err != nil {
 			result <- spiModel.NewDefaultPlcSubscriptionRequestResult(subscriptionRequest, nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack()))
@@ -81,8 +81,6 @@ func (s *Subscriber) subscribeSync(result chan apiModel.PlcSubscriptionRequestRe
 		cycleTime = 1 * time.Second
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), REQUEST_TIMEOUT)
-	defer cancel()
 	subscription, err := s.onSubscribeCreateSubscription(ctx, cycleTime)
 	if err != nil {
 		result <- spiModel.NewDefaultPlcSubscriptionRequestResult(subscriptionRequest, nil, errors.Wrap(err, "error create subscription"))
@@ -192,11 +190,12 @@ func (s *Subscriber) onSubscribeCreateSubscription(ctx context.Context, cycleTim
 }
 
 func (s *Subscriber) onDisconnect() {
+	ctx := context.TODO()
 	s.log.Trace().Msg("disconnecting")
 	for _, handle := range s.subscriptions {
 		handle.stopSubscriber()
 	}
-	s.connection.channel.onDisconnect(context.Background(), s.connection)
+	s.connection.channel.onDisconnect(ctx, s.connection)
 }
 
 func (s *Subscriber) Unsubscribe(ctx context.Context, unsubscriptionRequest apiModel.PlcUnsubscriptionRequest) <-chan apiModel.PlcUnsubscriptionRequestResult {

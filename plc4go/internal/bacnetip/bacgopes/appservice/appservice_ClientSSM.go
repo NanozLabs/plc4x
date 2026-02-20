@@ -254,7 +254,7 @@ func (c *ClientSSM) ProcessTask() error {
 
 // abort This function is called when the transaction should be aborted
 func (c *ClientSSM) abort(reason readWriteModel.BACnetAbortReason) (PDU, error) {
-	c.log.Debug().Stringer("reason", reason).Msg("abort")
+	c.log.Debug().Interface("reason", reason).Msg("abort")
 
 	// change the state to aborted
 	if err := c.setState(SSMState_ABORTED, nil); err != nil {
@@ -269,7 +269,7 @@ func (c *ClientSSM) abort(reason readWriteModel.BACnetAbortReason) (PDU, error) 
 
 // segmentedRequest This function is called when the client is sending a segmented request and receives an apdu
 func (c *ClientSSM) segmentedRequest(apdu PDU) error {
-	c.log.Debug().Stringer("apdu", apdu).Msg("segmentedRequest")
+	c.log.Debug().Interface("apdu", apdu).Msg("segmentedRequest")
 
 	switch _apdu := apdu.GetRootMessage().(type) {
 	// server is ready for the next segment
@@ -406,7 +406,7 @@ func (c *ClientSSM) segmentedRequestTimeout() error {
 }
 
 func (c *ClientSSM) awaitConfirmation(apdu PDU) error {
-	c.log.Debug().Stringer("apdu", apdu).Msg("awaitConfirmation")
+	c.log.Debug().Interface("apdu", apdu).Msg("awaitConfirmation")
 
 	switch _apdu := apdu.GetRootMessage().(type) {
 	case readWriteModel.APDUAbort:
@@ -527,7 +527,8 @@ func (c *ClientSSM) awaitConfirmationTimeout() error {
 }
 
 func (c *ClientSSM) segmentedConfirmation(apdu PDU) error {
-	c.log.Debug().Stringer("apdu", apdu).Msg("segmentedConfirmation")
+	ctx := context.TODO()
+	c.log.Debug().Interface("apdu", apdu).Msg("segmentedConfirmation")
 
 	// the only messages we should be getting are complex acks
 	apduComplexAck, ok := apdu.(readWriteModel.APDUComplexAck)
@@ -599,7 +600,7 @@ func (c *ClientSSM) segmentedConfirmation(apdu PDU) error {
 		}
 		// TODO: this is nonsense... We need to parse the service and the apdu not sure where to get it from now...
 		// TODO: it should be the original apdu, we might just need to use that as base and forward it as non segmented
-		ctxForModel := options.GetLoggerContextForModel(context.TODO(), c.log, options.WithPassLoggerToModel(c.passLogToModel))
+		ctxForModel := options.GetLoggerContextForModel(ctx, c.log, options.WithPassLoggerToModel(c.passLogToModel))
 		parse, err := readWriteModel.APDUParse[readWriteModel.APDU](ctxForModel, c.segmentAPDU.serviceBytes, uint16(len(c.segmentAPDU.serviceBytes)))
 		if err != nil {
 			return errors.Wrap(err, "error parsing apdu")

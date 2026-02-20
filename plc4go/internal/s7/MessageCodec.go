@@ -40,6 +40,10 @@ type MessageCodec struct {
 	log            zerolog.Logger
 }
 
+var (
+	_ spi.TransportInstanceExposer = (*MessageCodec)(nil)
+)
+
 func NewMessageCodec(transportInstance transports.TransportInstance, _options ...options.WithOption) *MessageCodec {
 	passLoggerToModel, _ := options.ExtractPassLoggerToModel(_options...)
 	extractCustomLogger := options.ExtractCustomLoggerOrDefaultToGlobal(_options...)
@@ -55,8 +59,8 @@ func (m *MessageCodec) GetCodec() spi.MessageCodec {
 	return m
 }
 
-func (m *MessageCodec) Send(message spi.Message) error {
-	m.log.Trace().Msg("Sending message")
+func (m *MessageCodec) Send(ctx context.Context, interactionInfo string, message spi.Message) error {
+	m.log.Trace().Str("interactionInfo", interactionInfo).Msg("Sending message")
 	// Cast the message to the correct type of struct
 	tpktPacket := message.(model.TPKTPacket)
 	// Serialize the request
@@ -66,18 +70,18 @@ func (m *MessageCodec) Send(message spi.Message) error {
 	}
 
 	// Send it to the PLC
-	err = m.GetTransportInstance().Write(theBytes)
+	err = m.GetTransportInstance().Write(ctx, theBytes)
 	if err != nil {
 		return errors.Wrap(err, "error sending request")
 	}
 	return nil
 }
 
-func (m *MessageCodec) Receive() (spi.Message, error) {
+func (m *MessageCodec) Receive(ctx context.Context) (spi.Message, error) {
 	// We need at least 6 bytes in order to know how big the packet is in total
 	if num, err := m.GetTransportInstance().GetNumBytesAvailableInBuffer(); (err == nil) && (num >= 4) {
 		m.log.Debug().Uint32("num", num).Msg("we got %d readable bytes")
-		data, err := m.GetTransportInstance().PeekReadableBytes(4)
+		data, err := m.GetTransportInstance().PeekReadableBytes(ctx, 4)
 		if err != nil {
 			m.log.Warn().Err(err).Msg("error peeking")
 			// TODO: Possibly clean up ...
@@ -89,13 +93,13 @@ func (m *MessageCodec) Receive() (spi.Message, error) {
 			m.log.Debug().Uint32("num", num).Uint32("packetSize", packetSize).Msg("Not enough bytes. Got: num Need: packetSize")
 			return nil, nil
 		}
-		data, err = m.GetTransportInstance().Read(packetSize)
+		data, err = m.GetTransportInstance().Read(ctx, packetSize)
 		if err != nil {
 			m.log.Debug().Err(err).Msg("Error reading")
 			// TODO: Possibly clean up ...
 			return nil, nil
 		}
-		ctxForModel := options.GetLoggerContextForModel(context.Background(), m.log, options.WithPassLoggerToModel(m.passLogToModel))
+		ctxForModel := options.GetLoggerContextForModel(ctx, m.log, options.WithPassLoggerToModel(m.passLogToModel))
 		tpktPacket, err := model.TPKTPacketParse(ctxForModel, data)
 		if err != nil {
 			m.log.Warn().Err(err).Msg("error parsing")

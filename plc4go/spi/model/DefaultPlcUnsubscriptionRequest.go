@@ -64,15 +64,9 @@ func NewDefaultPlcUnsubscriptionRequest(subscriptionHandles []apiModel.PlcSubscr
 	}
 }
 
-func (d *DefaultPlcUnsubscriptionRequest) Execute() <-chan apiModel.PlcUnsubscriptionRequestResult {
-	return d.ExecuteWithContext(context.Background())
-}
-
-func (d *DefaultPlcUnsubscriptionRequest) ExecuteWithContext(ctx context.Context) <-chan apiModel.PlcUnsubscriptionRequestResult {
+func (d *DefaultPlcUnsubscriptionRequest) Execute(ctx context.Context) <-chan apiModel.PlcUnsubscriptionRequestResult {
 	results := make(chan apiModel.PlcUnsubscriptionRequestResult, 1)
-	d.wg.Add(1)
-	go func() {
-		defer d.wg.Done()
+	d.wg.Go(func() {
 		var collectedErrors []error
 		for _, handle := range d.subscriptionHandles {
 			select {
@@ -90,7 +84,7 @@ func (d *DefaultPlcUnsubscriptionRequest) ExecuteWithContext(ctx context.Context
 			finalErr = errors.Wrap(err, "error unsubscribing from all")
 		}
 		results <- NewDefaultPlcUnsubscriptionRequestResult(d, NewDefaultPlcUnsubscriptionResponse(d), finalErr)
-	}()
+	})
 	return results
 }
 

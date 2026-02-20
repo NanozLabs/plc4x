@@ -31,7 +31,6 @@ import (
 	apiModel "github.com/apache/plc4x/plc4go/pkg/api/model"
 	apiValues "github.com/apache/plc4x/plc4go/pkg/api/values"
 	readWriteModel "github.com/apache/plc4x/plc4go/protocols/opcua/readwrite/model"
-	"github.com/apache/plc4x/plc4go/spi/utils"
 	spiValues "github.com/apache/plc4x/plc4go/spi/values"
 )
 
@@ -60,7 +59,7 @@ func generateNodeId(tag Tag) (readWriteModel.NodeId, error) {
 		}
 		nodeId = readWriteModel.NewNodeId(readWriteModel.NewNodeIdGuid( /*TODO: do we want to check for overflow?*/ uint16(tag.GetNamespace()), guidBytes))
 	} else if tag.GetIdentifierType() == readWriteModel.OpcuaIdentifierType_STRING_IDENTIFIER {
-		nodeId = readWriteModel.NewNodeId(readWriteModel.NewNodeIdString( /*TODO: do we want to check for overflow?*/ uint16(tag.GetNamespace()), readWriteModel.NewPascalString(utils.ToPtr(tag.GetIdentifier()))))
+		nodeId = readWriteModel.NewNodeId(readWriteModel.NewNodeIdString( /*TODO: do we want to check for overflow?*/ uint16(tag.GetNamespace()), readWriteModel.NewPascalString(new(tag.GetIdentifier()))))
 	}
 	return nodeId, nil
 }
@@ -248,7 +247,7 @@ func readResponse(localLog zerolog.Logger, readRequestIn apiModel.PlcReadRequest
 			} else {
 				responseCode = apiModel.PlcResponseCode_UNSUPPORTED
 			}
-			localLog.Error().Stringer("statusCode", results[count].GetStatusCode()).Msg("Error while reading value from OPC UA server error code")
+			localLog.Error().Interface("statusCode", results[count].GetStatusCode()).Msg("Error while reading value from OPC UA server error code")
 		}
 		count++
 		responseCodes[tagName] = responseCode

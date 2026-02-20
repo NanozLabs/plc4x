@@ -35,12 +35,17 @@ import (
 //go:generate go tool plc4xGenerator -type=MessageCodec
 type MessageCodec struct {
 	_default.DefaultCodec
+
 	sequenceCounter    int32
 	messageInterceptor func(message spi.Message)
 
 	passLogToModel bool
 	log            zerolog.Logger
 }
+
+var (
+	_ spi.TransportInstanceExposer = (*MessageCodec)(nil)
+)
 
 func NewMessageCodec(transportInstance transports.TransportInstance, messageInterceptor func(message spi.Message), _options ...options.WithOption) *MessageCodec {
 	passLoggerToModel, _ := options.ExtractPassLoggerToModel(_options...)
@@ -62,8 +67,8 @@ func (m *MessageCodec) GetCodec() spi.MessageCodec {
 	return m
 }
 
-func (m *MessageCodec) Send(message spi.Message) error {
-	m.log.Trace().Msg("Sending message")
+func (m *MessageCodec) Send(ctx context.Context, interactionInfo string, message spi.Message) error {
+	m.log.Trace().Str("interactionInfo", interactionInfo).Msg("Sending message")
 	// Cast the message to the correct type of struct
 	knxMessage := message.(model.KnxNetIpMessage)
 	// Serialize the request
@@ -73,18 +78,18 @@ func (m *MessageCodec) Send(message spi.Message) error {
 	}
 
 	// Send it to the PLC
-	err = m.GetTransportInstance().Write(theBytes)
+	err = m.GetTransportInstance().Write(ctx, theBytes)
 	if err != nil {
 		return errors.Wrap(err, "error sending request ")
 	}
 	return nil
 }
 
-func (m *MessageCodec) Receive() (spi.Message, error) {
+func (m *MessageCodec) Receive(ctx context.Context) (spi.Message, error) {
 	// We need at least 6 bytes in order to know how big the packet is in total
 	if num, err := m.GetTransportInstance().GetNumBytesAvailableInBuffer(); (err == nil) && (num >= 6) {
 		m.log.Debug().Uint32("num", num).Msg("we got num readable bytes")
-		data, err := m.GetTransportInstance().PeekReadableBytes(6)
+		data, err := m.GetTransportInstance().PeekReadableBytes(ctx, 6)
 		if err != nil {
 			m.log.Warn().Err(err).Msg("error peeking")
 			// TODO: Possibly clean up ...
@@ -96,13 +101,13 @@ func (m *MessageCodec) Receive() (spi.Message, error) {
 			m.log.Trace().Uint32("num", num).Uint32("packetSize", packetSize).Msg("Not enough bytes. Got: num Need: packetSize")
 			return nil, nil
 		}
-		data, err = m.GetTransportInstance().Read(packetSize)
+		data, err = m.GetTransportInstance().Read(ctx, packetSize)
 		if err != nil {
 			m.log.Warn().Err(err).Msg("error reading")
 			// TODO: Possibly clean up ...
 			return nil, nil
 		}
-		ctxForModel := options.GetLoggerContextForModel(context.Background(), m.log, options.WithPassLoggerToModel(m.passLogToModel))
+		ctxForModel := options.GetLoggerContextForModel(ctx, m.log, options.WithPassLoggerToModel(m.passLogToModel))
 		knxMessage, err := model.KnxNetIpMessageParse[model.KnxNetIpMessage](ctxForModel, data)
 		if err != nil {
 			m.log.Warn().Err(err).Msg("error parsing message")
@@ -118,7 +123,7 @@ func (m *MessageCodec) Receive() (spi.Message, error) {
 }
 
 func CustomMessageHandling(localLog zerolog.Logger) _default.CustomMessageHandler {
-	return func(codec _default.DefaultCodecRequirements, message spi.Message) bool {
+	return func(ctx context.Context, codec _default.DefaultCodecRequirements, message spi.Message) bool {
 		// If this message is a simple KNXNet/IP UDP Ack, ignore it for now
 		tunnelingResponse := message.(model.TunnelingResponse)
 		if tunnelingResponse != nil {
@@ -134,7 +139,7 @@ func CustomMessageHandling(localLog zerolog.Logger) _default.CustomMessageHandle
 					tunnelingRequest.GetTunnelingRequestDataBlock().GetSequenceCounter(),
 					model.Status_NO_ERROR),
 			)
-			err := codec.Send(response)
+			err := codec.Send(ctx, "tunneling_request", response) // TODO: where is a good place to get this timeout from?
 			if err != nil {
 				localLog.Warn().Err(err).Msg("got an error sending ACK from transport")
 			}

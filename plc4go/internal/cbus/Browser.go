@@ -84,7 +84,7 @@ func (m *Browser) browseUnitInfo(ctx context.Context, interceptor func(result ap
 	}
 unitLoop:
 	for _, unit := range units {
-		unitLog := m.log.With().Stringer("unit", unit).Logger()
+		unitLog := m.log.With().Interface("unit", unit).Logger()
 		unitLog.Trace().Msg("checking unit")
 		if err := ctx.Err(); err != nil {
 			unitLog.Info().Err(err).Msg("Aborting scan at unit")
@@ -121,14 +121,14 @@ unitLoop:
 			readRequest, _ := m.connection.ReadRequestBuilder().
 				AddTag(readTagName, NewCALIdentifyTag(unit, nil /*TODO: add bridge support*/, attribute, 1)).
 				Build()
-			timeout := 5 * time.Second
+			timeout := 5 * time.Second // TODO: do we want to keep this
 			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, timeout)
 			m.log.Trace().
 				Stringer("readRequest", readRequest).
 				Dur("timeout", timeout).
 				Msg("Executing readRequest with timeout")
-			requestResult := <-readRequest.ExecuteWithContext(timeoutCtx)
-			m.log.Trace().Stringer("requestResult", requestResult).Msg("got a response")
+			requestResult := <-readRequest.Execute(timeoutCtx)
+			m.log.Trace().Interface("requestResult", requestResult).Msg("got a response")
 			timeoutCancel()
 			if err := requestResult.GetErr(); err != nil {
 				if allUnits || allAttributes {
@@ -218,7 +218,7 @@ func (m *Browser) getInstalledUnitAddressBytes(ctx context.Context) (map[byte]an
 	}
 	subCtx, subCtxCancel := context.WithTimeout(ctx, 2*time.Second)
 	defer subCtxCancel()
-	subscriptionResult := <-subscriptionRequest.ExecuteWithContext(subCtx)
+	subscriptionResult := <-subscriptionRequest.Execute(subCtx)
 	if err := subscriptionResult.GetErr(); err != nil {
 		return nil, errors.Wrap(err, "Error subscribing to the mmi")
 	}
@@ -234,7 +234,7 @@ func (m *Browser) getInstalledUnitAddressBytes(ctx context.Context) (map[byte]an
 	if err != nil {
 		return nil, errors.Wrap(err, "Error building unsubscription request")
 	}
-	defer build.ExecuteWithContext(ctx)
+	defer build.Execute(ctx)
 
 	blockOffset0Received := false
 	blockOffset0ReceivedChan := make(chan any, 100) // We only expect one, but we make it a bit bigger to no clog up
@@ -244,14 +244,14 @@ func (m *Browser) getInstalledUnitAddressBytes(ctx context.Context) (map[byte]an
 	blockOffset176ReceivedChan := make(chan any, 100) // We only expect one, but we make it a bit bigger to no clog up
 	result := make(map[byte]any)
 	plcConsumerRegistration := subscriptionHandle.Register(func(event apiModel.PlcSubscriptionEvent) {
-		m.log.Trace().Stringer("event", event).Msg("handling event")
+		m.log.Trace().Interface("event", event).Msg("handling event")
 		if responseCode := event.GetResponseCode("installationMMIMonitor"); responseCode != apiModel.PlcResponseCode_OK {
-			m.log.Warn().Stringer("event", event).Msg("Ignoring")
+			m.log.Warn().Interface("event", event).Msg("Ignoring")
 			return
 		}
 		rootValue := event.GetValue("installationMMIMonitor")
 		if !rootValue.IsStruct() {
-			m.log.Warn().Stringer("rootValue", rootValue).Msg("Ignoring rootValue should be a struct")
+			m.log.Warn().Interface("rootValue", rootValue).Msg("Ignoring rootValue should be a struct")
 			return
 		}
 		rootStruct := rootValue.GetStruct()
@@ -339,9 +339,7 @@ func (m *Browser) getInstalledUnitAddressBytes(ctx context.Context) (map[byte]an
 	readCtx, readCtxCancel := context.WithTimeout(ctx, 2*time.Second)
 	defer readCtxCancel()
 	readWg := new(sync.WaitGroup)
-	readWg.Add(1)
-	go func() {
-		defer readWg.Done()
+	readWg.Go(func() {
 		defer func() {
 			if err := recover(); err != nil {
 				m.log.Error().
@@ -351,8 +349,8 @@ func (m *Browser) getInstalledUnitAddressBytes(ctx context.Context) (map[byte]an
 			}
 		}()
 		defer readCtxCancel()
-		m.log.Debug().Stringer("readRequest", readRequest).Msg("sending read request")
-		readRequestResult := <-readRequest.ExecuteWithContext(readCtx)
+		m.log.Debug().Interface("readRequest", readRequest).Msg("sending read request")
+		readRequestResult := <-readRequest.Execute(readCtx)
 		if err := readRequestResult.GetErr(); err != nil {
 			m.log.Warn().Err(err).Msg("Error reading the mmi")
 			return
@@ -361,7 +359,7 @@ func (m *Browser) getInstalledUnitAddressBytes(ctx context.Context) (map[byte]an
 		if responseCode := response.GetResponseCode("installationMMI"); responseCode == apiModel.PlcResponseCode_OK {
 			rootValue := response.GetValue("installationMMI")
 			if !rootValue.IsStruct() {
-				m.log.Warn().Err(err).Stringer("rootValue", rootValue).Msg("%v should be a struct")
+				m.log.Warn().Err(err).Interface("rootValue", rootValue).Msg("%v should be a struct")
 				return
 			}
 			rootStruct := rootValue.GetStruct()
@@ -431,10 +429,8 @@ func (m *Browser) getInstalledUnitAddressBytes(ctx context.Context) (map[byte]an
 				Stringer("responseCode", responseCode).
 				Msg("We got responseCode as response code for installation mmi so we rely on getting it via subscription")
 		}
-	}()
+	})
 
-	syncCtx, syncCtxCancel := context.WithTimeout(ctx, 6*time.Second)
-	defer syncCtxCancel()
 	for !blockOffset0Received || !blockOffset88Received || !blockOffset176Received {
 		select {
 		case <-blockOffset0ReceivedChan:
@@ -446,8 +442,8 @@ func (m *Browser) getInstalledUnitAddressBytes(ctx context.Context) (map[byte]an
 		case <-blockOffset176ReceivedChan:
 			m.log.Trace().Msg("Offset 176 received")
 			blockOffset176Received = true
-		case <-syncCtx.Done():
-			err = syncCtx.Err()
+		case <-ctx.Done():
+			err = ctx.Err()
 			m.log.Trace().Err(err).Msg("Ending prematurely")
 			return nil, errors.Wrap(err, "error waiting for other offsets")
 		}

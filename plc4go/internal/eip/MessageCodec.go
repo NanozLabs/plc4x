@@ -37,10 +37,15 @@ import (
 //go:generate go tool plc4xGenerator -type=MessageCodec
 type MessageCodec struct {
 	_default.DefaultCodec
+
 	none bool // TODO: just a empty field to satisfy generator (needs fixing because in this case here we have the delegate)
 
 	log zerolog.Logger
 }
+
+var (
+	_ spi.TransportInstanceExposer = (*MessageCodec)(nil)
+)
 
 func NewMessageCodec(transportInstance transports.TransportInstance, _options ...options.WithOption) *MessageCodec {
 	customLogger := options.ExtractCustomLoggerOrDefaultToGlobal(_options...)
@@ -55,31 +60,31 @@ func (m *MessageCodec) GetCodec() spi.MessageCodec {
 	return m
 }
 
-func (m *MessageCodec) Send(message spi.Message) error {
-	m.log.Trace().Msg("Sending message")
+func (m *MessageCodec) Send(ctx context.Context, interactionInfo string, message spi.Message) error {
+	m.log.Trace().Str("interactionInfo", interactionInfo).Msg("Sending message")
 	// Cast the message to the correct type of struct
 	eipPacket := message.(model.EipPacket)
 	// Serialize the request
 	wb := utils.NewWriteBufferByteBased(utils.WithByteOrderForByteBasedBuffer(binary.LittleEndian))
-	err := eipPacket.SerializeWithWriteBuffer(context.Background(), wb)
+	err := eipPacket.SerializeWithWriteBuffer(ctx, wb)
 	if err != nil {
 		return errors.Wrap(err, "error serializing request")
 	}
 
 	// Send it to the PLC
-	err = m.GetTransportInstance().Write(wb.GetBytes())
+	err = m.GetTransportInstance().Write(ctx, wb.GetBytes())
 	if err != nil {
 		return errors.Wrap(err, "error sending request")
 	}
 	return nil
 }
 
-func (m *MessageCodec) Receive() (spi.Message, error) {
+func (m *MessageCodec) Receive(ctx context.Context) (spi.Message, error) {
 	// We need at least 6 bytes in order to know how big the packet is in total
 	transportInstance := m.GetTransportInstance()
 	if num, err := transportInstance.GetNumBytesAvailableInBuffer(); (err == nil) && (num >= 4) {
 		m.log.Debug().Uint32("num", num).Msg("we got num readable bytes")
-		data, err := transportInstance.PeekReadableBytes(4)
+		data, err := transportInstance.PeekReadableBytes(ctx, 4)
 		if err != nil {
 			m.log.Warn().Err(err).Msg("error peeking")
 			// TODO: Possibly clean up ...
@@ -91,14 +96,14 @@ func (m *MessageCodec) Receive() (spi.Message, error) {
 			m.log.Debug().Uint32("num", num).Uint32("packetSize", packetSize).Msg("Not enough bytes. Got: num Need: packetSize")
 			return nil, nil
 		}
-		data, err = transportInstance.Read(packetSize)
+		data, err = transportInstance.Read(ctx, packetSize)
 		if err != nil {
 			m.log.Debug().Err(err).Msg("Error reading")
 			// TODO: Possibly clean up ...
 			return nil, nil
 		}
 		rb := utils.NewReadBufferByteBased(data, utils.WithByteOrderForReadBufferByteBased(binary.LittleEndian))
-		eipPacket, err := model.EipPacketParseWithBuffer[model.EipPacket](context.Background(), rb, true)
+		eipPacket, err := model.EipPacketParseWithBuffer[model.EipPacket](ctx, rb, true)
 		if err != nil {
 			m.log.Warn().Err(err).Msg("error parsing")
 			// TODO: Possibly clean up ...

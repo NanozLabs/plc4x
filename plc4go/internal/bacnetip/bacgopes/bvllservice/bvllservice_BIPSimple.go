@@ -97,7 +97,7 @@ func (b *BIPSimple) Indication(args Args, kwArgs KWArgs) error {
 		if _debug != nil {
 			_debug("    - xpdu: %r", xpdu)
 		}
-		b.log.Debug().Stringer("xpdu", xpdu).Msg("xpdu")
+		b.log.Debug().Interface("xpdu", xpdu).Msg("xpdu")
 
 		// send it downstream
 		return b.Request(NA(xpdu), NoKWArgs())
@@ -111,7 +111,7 @@ func (b *BIPSimple) Indication(args Args, kwArgs KWArgs) error {
 		if _debug != nil {
 			_debug("    - xpdu: %r", xpdu)
 		}
-		b.log.Debug().Stringer("xpdu", xpdu).Msg("xpdu")
+		b.log.Debug().Interface("xpdu", xpdu).Msg("xpdu")
 
 		// send it downstream
 		return b.Request(NA(xpdu), NoKWArgs())
@@ -144,7 +144,7 @@ func (b *BIPSimple) Confirmation(args Args, kwArgs KWArgs) error {
 		if _debug != nil {
 			_debug("    - xpdu: %r", xpdu)
 		}
-		b.log.Debug().Stringer("xpdu", xpdu).Msg("xpdu")
+		b.log.Debug().Interface("xpdu", xpdu).Msg("xpdu")
 
 		// send it upstream
 		return b.Response(NA(xpdu), kwArgs)
@@ -154,7 +154,7 @@ func (b *BIPSimple) Confirmation(args Args, kwArgs KWArgs) error {
 		if _debug != nil {
 			_debug("    - xpdu: %r", xpdu)
 		}
-		b.log.Debug().Stringer("xpdu", xpdu).Msg("xpdu")
+		b.log.Debug().Interface("xpdu", xpdu).Msg("xpdu")
 
 		// send it upstream
 		return b.Response(NA(xpdu), kwArgs)
@@ -164,13 +164,13 @@ func (b *BIPSimple) Confirmation(args Args, kwArgs KWArgs) error {
 		if _debug != nil {
 			_debug("    - xpdu: %r", xpdu)
 		}
-		b.log.Debug().Stringer("xpdu", xpdu).Msg("xpdu")
+		b.log.Debug().Interface("xpdu", xpdu).Msg("xpdu")
 
 		// send it upstream
 		return b.Response(NA(xpdu), kwArgs)
 	case *WriteBroadcastDistributionTable:
 		// build a response
-		xpdu, err := NewResult(ToPtr(model.BVLCResultCode_WRITE_BROADCAST_DISTRIBUTION_TABLE_NAK), NoArgs, NKW(KWCPCIUserData, pdu.GetPDUUserData()))
+		xpdu, err := NewResult(new(model.BVLCResultCode_WRITE_BROADCAST_DISTRIBUTION_TABLE_NAK), NoArgs, NKW(KWCPCIUserData, pdu.GetPDUUserData()))
 		if err != nil {
 			return errors.Wrap(err, "error building result")
 		}
@@ -180,7 +180,7 @@ func (b *BIPSimple) Confirmation(args Args, kwArgs KWArgs) error {
 		return b.Request(NA(xpdu), kwArgs)
 	case *ReadBroadcastDistributionTable:
 		// build a response
-		xpdu, err := NewResult(ToPtr(model.BVLCResultCode_READ_BROADCAST_DISTRIBUTION_TABLE_NAK), NoArgs, NKW(KWCPCIUserData, pdu.GetPDUUserData()))
+		xpdu, err := NewResult(new(model.BVLCResultCode_READ_BROADCAST_DISTRIBUTION_TABLE_NAK), NoArgs, NKW(KWCPCIUserData, pdu.GetPDUUserData()))
 		if err != nil {
 			return errors.Wrap(err, "error building result")
 		}
@@ -191,7 +191,7 @@ func (b *BIPSimple) Confirmation(args Args, kwArgs KWArgs) error {
 		// build a response
 	case *RegisterForeignDevice:
 		// build a response
-		xpdu, err := NewResult(ToPtr(model.BVLCResultCode_REGISTER_FOREIGN_DEVICE_NAK), NoArgs, NKW(KWCPCIUserData, pdu.GetPDUUserData()))
+		xpdu, err := NewResult(new(model.BVLCResultCode_REGISTER_FOREIGN_DEVICE_NAK), NoArgs, NKW(KWCPCIUserData, pdu.GetPDUUserData()))
 		if err != nil {
 			return errors.Wrap(err, "error building result")
 		}
@@ -201,7 +201,7 @@ func (b *BIPSimple) Confirmation(args Args, kwArgs KWArgs) error {
 		return b.Request(NA(xpdu), kwArgs)
 	case *ReadForeignDeviceTable:
 		// build a response
-		xpdu, err := NewResult(ToPtr(model.BVLCResultCode_READ_FOREIGN_DEVICE_TABLE_NAK), NoArgs, NKW(KWCPCIUserData, pdu.GetPDUUserData()))
+		xpdu, err := NewResult(new(model.BVLCResultCode_READ_FOREIGN_DEVICE_TABLE_NAK), NoArgs, NKW(KWCPCIUserData, pdu.GetPDUUserData()))
 		if err != nil {
 			return errors.Wrap(err, "error building result")
 		}
@@ -211,7 +211,7 @@ func (b *BIPSimple) Confirmation(args Args, kwArgs KWArgs) error {
 		return b.Request(NA(xpdu), kwArgs)
 	case *DeleteForeignDeviceTableEntry:
 		// build a response
-		xpdu, err := NewResult(ToPtr(model.BVLCResultCode_DELETE_FOREIGN_DEVICE_TABLE_ENTRY_NAK), NoArgs, NKW(KWCPCIUserData, pdu.GetPDUUserData()))
+		xpdu, err := NewResult(new(model.BVLCResultCode_DELETE_FOREIGN_DEVICE_TABLE_ENTRY_NAK), NoArgs, NKW(KWCPCIUserData, pdu.GetPDUUserData()))
 		if err != nil {
 			return errors.Wrap(err, "error building result")
 		}
@@ -221,7 +221,7 @@ func (b *BIPSimple) Confirmation(args Args, kwArgs KWArgs) error {
 		return b.Request(NA(xpdu), kwArgs)
 	case *DistributeBroadcastToNetwork:
 		// build a response
-		xpdu, err := NewResult(ToPtr(model.BVLCResultCode_DISTRIBUTE_BROADCAST_TO_NETWORK_NAK), NoArgs, NKW(KWCPCIUserData, pdu.GetPDUUserData()))
+		xpdu, err := NewResult(new(model.BVLCResultCode_DISTRIBUTE_BROADCAST_TO_NETWORK_NAK), NoArgs, NKW(KWCPCIUserData, pdu.GetPDUUserData()))
 		if err != nil {
 			return errors.Wrap(err, "error building result")
 		}

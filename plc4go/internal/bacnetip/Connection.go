@@ -23,8 +23,8 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
+	"slices"
 	"sync"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -41,6 +41,7 @@ import (
 
 type Connection struct {
 	_default.DefaultConnection
+
 	invokeIdGenerator InvokeIdGenerator
 	messageCodec      spi.MessageCodec
 	subscribers       []*Subscriber
@@ -54,6 +55,10 @@ type Connection struct {
 	log      zerolog.Logger
 	_options []options.WithOption // Used to pass them downstream
 }
+
+var (
+	_ spi.TransportInstanceExposer = (*Connection)(nil)
+)
 
 func NewConnection(messageCodec spi.MessageCodec, tagHandler spi.PlcTagHandler, tm transactions.RequestTransactionManager, connectionOptions map[string][]string, _options ...options.WithOption) *Connection {
 	customLogger := options.ExtractCustomLoggerOrDefaultToGlobal(_options...)
@@ -88,45 +93,36 @@ func (c *Connection) GetTracer() tracer.Tracer {
 	return c.tracer
 }
 
-func (c *Connection) ConnectWithContext(ctx context.Context) <-chan plc4go.PlcConnectionConnectResult {
+func (c *Connection) Connect(ctx context.Context) error {
 	c.log.Trace().Msg("Connecting")
-	ch := make(chan plc4go.PlcConnectionConnectResult, 1)
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
+	if err := c.DefaultConnection.Connect(ctx); err != nil {
+		return errors.Wrap(err, "Error connecting default connection")
+	}
+	c.wg.Go(func() {
 		defer func() {
 			if err := recover(); err != nil {
-				ch <- _default.NewDefaultPlcConnectionConnectResult(nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack()))
+				c.log.Error().
+					Str("stack", string(debug.Stack())).
+					Interface("err", err).
+					Msg("panic-ed")
 			}
 		}()
-		connectionConnectResult := <-c.DefaultConnection.ConnectWithContext(ctx)
-		c.wg.Add(1)
-		go func() {
-			defer c.wg.Done()
-			defer func() {
-				if err := recover(); err != nil {
-					ch <- _default.NewDefaultPlcConnectionConnectResult(nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack()))
-				}
-			}()
-			for c.IsConnected() {
-				c.log.Trace().Msg("Polling data")
-				c.passToDefaultIncomingMessageChannel()
-			}
-			c.log.Info().Msg("Ending incoming message transfer")
-		}()
-		ch <- connectionConnectResult
-	}()
-	return ch
+		for c.IsConnected() {
+			c.log.Trace().Msg("Polling data")
+			c.passToDefaultIncomingMessageChannel()
+		}
+		c.log.Info().Msg("Ending incoming message transfer")
+	})
+	return nil
 }
 
 func (c *Connection) passToDefaultIncomingMessageChannel() {
 	incomingMessageChannel := c.messageCodec.GetDefaultIncomingMessageChannel()
-	timeout := time.NewTimer(20 * time.Millisecond)
 	select {
 	case message := <-incomingMessageChannel:
 		// TODO: implement mapping to subscribers
-		c.log.Info().Stringer("message", message).Msg("Received")
-	case <-timeout.C:
+		c.log.Info().Interface("message", message).Msg("Received")
+	default:
 		c.log.Info().Msg("Message was not handled")
 	}
 }
@@ -163,11 +159,9 @@ func (c *Connection) SubscriptionRequestBuilder() apiModel.PlcSubscriptionReques
 }
 
 func (c *Connection) addSubscriber(subscriber *Subscriber) {
-	for _, sub := range c.subscribers {
-		if sub == subscriber {
-			c.log.Debug().Stringer("subscriber", subscriber).Msg("Subscriber already added")
-			return
-		}
+	if slices.Contains(c.subscribers, subscriber) {
+		c.log.Debug().Interface("subscriber", subscriber).Msg("Subscriber already added")
+		return
 	}
 	c.subscribers = append(c.subscribers, subscriber)
 }

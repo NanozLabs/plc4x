@@ -43,9 +43,7 @@ func (m *Connection) WriteRequestBuilder() apiModel.PlcWriteRequestBuilder {
 func (m *Connection) Write(ctx context.Context, writeRequest apiModel.PlcWriteRequest) <-chan apiModel.PlcWriteRequestResult {
 	m.log.Trace().Msg("Writing")
 	result := make(chan apiModel.PlcWriteRequestResult, 1)
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
+	m.wg.Go(func() {
 		defer func() {
 			if err := recover(); err != nil {
 				result <- spiModel.NewDefaultPlcWriteRequestResult(writeRequest, nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack()))
@@ -56,7 +54,7 @@ func (m *Connection) Write(ctx context.Context, writeRequest apiModel.PlcWriteRe
 		} else {
 			m.multiWrite(ctx, writeRequest, result)
 		}
-	}()
+	})
 	return result
 }
 
@@ -106,9 +104,7 @@ func (m *Connection) singleWrite(ctx context.Context, writeRequest apiModel.PlcW
 	}
 	data := io.GetBytes()
 
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
+	m.wg.Go(func() {
 		defer func() {
 			if err := recover(); err != nil {
 				result <- spiModel.NewDefaultPlcWriteRequestResult(writeRequest, nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack()))
@@ -133,7 +129,7 @@ func (m *Connection) singleWrite(ctx context.Context, writeRequest apiModel.PlcW
 		}
 		// Return the response to the caller.
 		result <- spiModel.NewDefaultPlcWriteRequestResult(writeRequest, spiModel.NewDefaultPlcWriteResponse(writeRequest, responseCodes), nil)
-	}()
+	})
 }
 
 func (m *Connection) multiWrite(ctx context.Context, writeRequest apiModel.PlcWriteRequest, result chan apiModel.PlcWriteRequestResult) {
@@ -228,6 +224,7 @@ func (m *Connection) multiWrite(ctx context.Context, writeRequest apiModel.PlcWr
 }
 
 func (m *Connection) serializePlcValue(dataType driverModel.AdsDataTypeTableEntry, arrayInfo []apiModel.ArrayInfo, plcValue apiValues.PlcValue, wb utils.WriteBufferByteBased) error {
+	ctx := context.TODO()
 	// Decode the data according to the information from the request
 	// Based on the AdsDataTypeTableEntry in tag.DataType() parse the data
 	if len(arrayInfo) > 0 {
@@ -278,7 +275,7 @@ func (m *Connection) serializePlcValue(dataType driverModel.AdsDataTypeTableEntr
 			}
 			if child.GetOffset() > curPos {
 				skipBytes := child.GetOffset() - curPos
-				for i := uint32(0); i < skipBytes; i++ {
+				for range skipBytes {
 					_ = wb.WriteByte("", 0x00)
 				}
 			}
@@ -306,6 +303,6 @@ func (m *Connection) serializePlcValue(dataType driverModel.AdsDataTypeTableEntr
 		if !ok {
 			return errors.New(fmt.Sprintf("error converting plc4x plc-value type %s into ads plc-value type", valueType.String()))
 		}
-		return driverModel.DataItemSerializeWithWriteBuffer(context.Background(), wb, plcValue, adsValueType, stringLength)
+		return driverModel.DataItemSerializeWithWriteBuffer(ctx, wb, plcValue, adsValueType, stringLength)
 	}
 }

@@ -23,7 +23,6 @@ import (
 	"context"
 	"runtime/debug"
 	"sync"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -60,9 +59,7 @@ func NewWriter(tpduGenerator *AlphaGenerator, messageCodec *MessageCodec, tm tra
 func (m *Writer) Write(ctx context.Context, writeRequest apiModel.PlcWriteRequest) <-chan apiModel.PlcWriteRequestResult {
 	m.log.Trace().Msg("Writing")
 	result := make(chan apiModel.PlcWriteRequestResult, 1)
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
+	m.wg.Go(func() {
 		defer func() {
 			if err := recover(); err != nil {
 				result <- spiModel.NewDefaultPlcWriteRequestResult(writeRequest, nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack()))
@@ -115,11 +112,13 @@ func (m *Writer) Write(ctx context.Context, writeRequest apiModel.PlcWriteReques
 			}
 			tagNameCopy := tagName
 			// Start a new request-transaction (Is ended in the response-handler)
-			transaction := m.tm.StartTransaction()
-			transaction.Submit(func(transaction transactions.RequestTransaction) {
+			transaction := m.tm.StartTransaction("write")
+			transaction.Submit("writeOperation", func(transactionContext context.Context, transaction transactions.RequestTransaction) {
+				ctx, cancel := context.WithCancel(ctx)
+				context.AfterFunc(transactionContext, cancel)
 				// Send the  over the wire
 				m.log.Trace().Msg("Send ")
-				if err := m.messageCodec.SendRequest(ctx, messageToSend, func(receivedMessage spi.Message) bool {
+				if err := m.messageCodec.SendRequest(ctx, "write", messageToSend, func(receivedMessage spi.Message) bool {
 					cbusMessage, ok := receivedMessage.(readWriteModel.CBusMessage)
 					if !ok {
 						return false
@@ -148,10 +147,10 @@ func (m *Writer) Write(ctx context.Context, writeRequest apiModel.PlcWriteReques
 					addResponseCode(tagNameCopy, apiModel.PlcResponseCode_REQUEST_TIMEOUT)
 					// TODO: ok or not ok?
 					return transaction.EndRequest()
-				}, time.Second*1); err != nil {
+				}); err != nil {
 					m.log.Debug().Str("tagName", tagNameCopy).Err(err).Msg("Error sending message for tag")
 					addResponseCode(tagNameCopy, apiModel.PlcResponseCode_INTERNAL_ERROR)
-					if err := transaction.FailRequest(errors.Errorf("timeout after %s", time.Second*1)); err != nil {
+					if err := transaction.FailRequest(err); err != nil {
 						m.log.Debug().Err(err).Msg("Error failing request")
 					}
 				}
@@ -159,6 +158,6 @@ func (m *Writer) Write(ctx context.Context, writeRequest apiModel.PlcWriteReques
 		}
 		readResponse := spiModel.NewDefaultPlcWriteResponse(writeRequest, responseCodes)
 		result <- spiModel.NewDefaultPlcWriteRequestResult(writeRequest, readResponse, nil)
-	}()
+	})
 	return result
 }

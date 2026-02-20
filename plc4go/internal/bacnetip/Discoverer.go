@@ -167,16 +167,14 @@ func (d *Discoverer) broadcastAndDiscover(ctx context.Context, communicationChan
 			}
 		}
 
-		go func(communicationChannelInstance communicationChannel) {
+		d.wg.Go(func() {
 			for {
 				if err := ctx.Err(); err != nil {
 					d.log.Debug().Err(err).Msg("ending")
 					return
 				}
 				blockingReadChan := make(chan bool)
-				d.wg.Add(1)
-				go func() {
-					defer d.wg.Done()
+				d.wg.Go(func() {
 					buf := make([]byte, 4096)
 					n, addr, err := communicationChannelInstance.unicastConnection.ReadFrom(buf)
 					if err != nil {
@@ -194,7 +192,7 @@ func (d *Discoverer) broadcastAndDiscover(ctx context.Context, communicationChan
 					}
 					incomingBVLCChannel <- receivedBvlcMessage{incomingBvlc, addr}
 					blockingReadChan <- true
-				}()
+				})
 				select {
 				case ok := <-blockingReadChan:
 					if !ok {
@@ -207,18 +205,16 @@ func (d *Discoverer) broadcastAndDiscover(ctx context.Context, communicationChan
 					return
 				}
 			}
-		}(communicationChannelInstance)
+		})
 
-		go func(communicationChannelInstance communicationChannel) {
+		d.wg.Go(func() {
 			for {
 				if err := ctx.Err(); err != nil {
 					d.log.Debug().Err(err).Msg("ending")
 					return
 				}
 				blockingReadChan := make(chan bool)
-				d.wg.Add(1)
-				go func() {
-					defer d.wg.Done()
+				d.wg.Go(func() {
 					buf := make([]byte, 4096)
 					n, addr, err := communicationChannelInstance.broadcastConnection.ReadFrom(buf)
 					if err != nil {
@@ -235,7 +231,7 @@ func (d *Discoverer) broadcastAndDiscover(ctx context.Context, communicationChan
 					}
 					incomingBVLCChannel <- receivedBvlcMessage{incomingBvlc, addr}
 					blockingReadChan <- true
-				}()
+				})
 				select {
 				case ok := <-blockingReadChan:
 					if !ok {
@@ -248,7 +244,7 @@ func (d *Discoverer) broadcastAndDiscover(ctx context.Context, communicationChan
 					return
 				}
 			}
-		}(communicationChannelInstance)
+		})
 	}
 	return incomingBVLCChannel, nil
 }
@@ -268,12 +264,12 @@ func (d *Discoverer) handleIncomingBVLCs(ctx context.Context, callback func(even
 			_ = npdu
 			if apdu := npdu.GetApdu(); apdu == nil {
 				nlm := npdu.GetNlm()
-				d.log.Debug().Stringer("nlm", nlm).Msg("Got nlm")
+				d.log.Debug().Interface("nlm", nlm).Msg("Got nlm")
 				continue
 			}
 			apdu := npdu.GetApdu()
 			if _, ok := apdu.(driverModel.APDUConfirmedRequest); ok {
-				d.log.Debug().Stringer("apdu", apdu).Msg("Got apdu")
+				d.log.Debug().Interface("apdu", apdu).Msg("Got apdu")
 				continue
 			}
 			apduUnconfirmedRequest := apdu.(driverModel.APDUUnconfirmedRequest)
@@ -582,8 +578,8 @@ func extractProtocolSpecificOptions(discoveryOptions []options.WithDiscoveryOpti
 	for key, value := range keyDependencies {
 		if _, ok := filteredOptionMap[key]; ok {
 			for _, otherKey := range value {
-				if strings.HasSuffix(otherKey.key, "*") {
-					prefix := strings.TrimSuffix(otherKey.key, "*")
+				if before, ok0 := strings.CutSuffix(otherKey.key, "*"); ok0 {
+					prefix := before
 					mustBePresent := otherKey.mustBePresent
 					var found bool
 					for key := range filteredOptionMap {
