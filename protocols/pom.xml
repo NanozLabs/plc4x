@@ -44,6 +44,7 @@
     <module>bacnetip</module>
     <module>canopen</module>
     <module>df1</module>
+    <module>dlt645</module>
     <module>eip</module>
     <module>firmata</module>
     <module>genericcan</module>

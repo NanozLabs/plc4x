@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+      https://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+  -->
+<test:testsuite xmlns:test="https://plc4x.apache.org/schemas/parser-serializer-testsuite.xsd"
+                byteOrder="BIG_ENDIAN">
+
+  <name>DL/T 645-2007</name>
+
+  <protocolName>dlt645</protocolName>
+  <outputFlavor>read-write</outputFlavor>
+
+  <!-- Test 1: Read Data Request
+       Address: 112233445566, Control: 0x11 (READ_DATA), Length: 4
+       DataPlain: 00000000 -> Wire: 33333333
+       CS = 0x68+0x11+0x22+0x33+0x44+0x55+0x66+0x68+0x11+0x04+0x33+0x33+0x33+0x33
+          = 790 mod 256 = 22 = 0x16 -->
+  <testcase>
+    <name>Read Data Request (+33H decode and checksum)</name>
+    <raw>68112233445566681104333333331616</raw>
+    <root-type>Dlt645Frame</root-type>
+    <parser-arguments>
+      <response>false</response>
+    </parser-arguments>
+    <xml>
+      <Dlt645Frame>
+        <start1 dataType="uint" bitLength="8">104</start1>
+        <address dataType="byte" bitLength="48">0x112233445566</address>
+        <start2 dataType="uint" bitLength="8">104</start2>
+        <control dataType="uint" bitLength="8" stringRepresentation="READ_DATA">17</control>
+        <length dataType="uint" bitLength="8">4</length>
+        <dataPlain dataType="byte" bitLength="32">0x00000000</dataPlain>
+        <cs dataType="uint" bitLength="8">22</cs>
+        <end dataType="uint" bitLength="8">22</end>
+      </Dlt645Frame>
+    </xml>
+  </testcase>
+
+  <!-- Test 2: Read Data Response
+       Address: 112233445566, Control: 0x91 (READ_DATA_RESPONSE), Length: 6
+       DataPlain: 000000000102 -> Wire: 333333333435
+       CS = 0x68+0x11+0x22+0x33+0x44+0x55+0x66+0x68+0x91+0x06+0x33+0x33+0x33+0x33+0x34+0x35
+          = 1025 mod 256 = 1 = 0x01 -->
+  <testcase>
+    <name>Read Data Response (+33H decode and checksum)</name>
+    <raw>681122334455666891063333333334350116</raw>
+    <root-type>Dlt645Frame</root-type>
+    <parser-arguments>
+      <response>true</response>
+    </parser-arguments>
+    <xml>
+      <Dlt645Frame>
+        <start1 dataType="uint" bitLength="8">104</start1>
+        <address dataType="byte" bitLength="48">0x112233445566</address>
+        <start2 dataType="uint" bitLength="8">104</start2>
+        <control dataType="uint" bitLength="8" stringRepresentation="READ_DATA_RESPONSE">145</control>
+        <length dataType="uint" bitLength="8">6</length>
+        <dataPlain dataType="byte" bitLength="48">0x000000000102</dataPlain>
+        <cs dataType="uint" bitLength="8">1</cs>
+        <end dataType="uint" bitLength="8">22</end>
+      </Dlt645Frame>
+    </xml>
+  </testcase>
+
+  <!-- Test 3: Write Data Request
+       Address: 112233445566, Control: 0x14 (WRITE_DATA), Length: 6
+       DataPlain: 010000001234 -> Wire: 343333334567
+       CS = 0x68+0x11+0x22+0x33+0x44+0x55+0x66+0x68+0x14+0x06+0x34+0x33+0x33+0x33+0x45+0x67
+          = 968 mod 256 = 200 = 0xC8 -->
+  <testcase>
+    <name>Write Data Request (+33H encode/decode)</name>
+    <raw>68112233445566681406343333334567C816</raw>
+    <root-type>Dlt645Frame</root-type>
+    <parser-arguments>
+      <response>false</response>
+    </parser-arguments>
+    <xml>
+      <Dlt645Frame>
+        <start1 dataType="uint" bitLength="8">104</start1>
+        <address dataType="byte" bitLength="48">0x112233445566</address>
+        <start2 dataType="uint" bitLength="8">104</start2>
+        <control dataType="uint" bitLength="8" stringRepresentation="WRITE_DATA">20</control>
+        <length dataType="uint" bitLength="8">6</length>
+        <dataPlain dataType="byte" bitLength="48">0x010000001234</dataPlain>
+        <cs dataType="uint" bitLength="8">200</cs>
+        <end dataType="uint" bitLength="8">22</end>
+      </Dlt645Frame>
+    </xml>
+  </testcase>
+
+  <!-- Test 4: Write Data Response
+       Address: 112233445566, Control: 0x94 (WRITE_DATA_RESPONSE), Length: 4
+       DataPlain: 01000000 -> Wire: 34333333
+       CS = 0x68+0x11+0x22+0x33+0x44+0x55+0x66+0x68+0x94+0x04+0x34+0x33+0x33+0x33
+          = 922 mod 256 = 154 = 0x9A -->
+  <testcase>
+    <name>Write Data Response</name>
+    <raw>68112233445566689404343333339A16</raw>
+    <root-type>Dlt645Frame</root-type>
+    <parser-arguments>
+      <response>true</response>
+    </parser-arguments>
+    <xml>
+      <Dlt645Frame>
+        <start1 dataType="uint" bitLength="8">104</start1>
+        <address dataType="byte" bitLength="48">0x112233445566</address>
+        <start2 dataType="uint" bitLength="8">104</start2>
+        <control dataType="uint" bitLength="8" stringRepresentation="WRITE_DATA_RESPONSE">148</control>
+        <length dataType="uint" bitLength="8">4</length>
+        <dataPlain dataType="byte" bitLength="32">0x01000000</dataPlain>
+        <cs dataType="uint" bitLength="8">154</cs>
+        <end dataType="uint" bitLength="8">22</end>
+      </Dlt645Frame>
+    </xml>
+  </testcase>
+
+  <!-- Test 5: Broadcast Time Sync - Empty Data Boundary
+       Address: 112233445566, Control: 0x08 (BROADCAST_TIME_SYNC), Length: 0
+       No data.
+       CS = 0x68+0x11+0x22+0x33+0x44+0x55+0x66+0x68+0x08+0x00
+          = 573 mod 256 = 61 = 0x3D -->
+  <testcase>
+    <name>Broadcast Time Sync Request - Empty Data Boundary</name>
+    <raw>681122334455666808003D16</raw>
+    <root-type>Dlt645Frame</root-type>
+    <parser-arguments>
+      <response>false</response>
+    </parser-arguments>
+    <xml>
+      <Dlt645Frame>
+        <start1 dataType="uint" bitLength="8">104</start1>
+        <address dataType="byte" bitLength="48">0x112233445566</address>
+        <start2 dataType="uint" bitLength="8">104</start2>
+        <control dataType="uint" bitLength="8" stringRepresentation="BROADCAST_TIME_SYNC">8</control>
+        <length dataType="uint" bitLength="8">0</length>
+        <dataPlain dataType="byte" bitLength="0">0x</dataPlain>
+        <cs dataType="uint" bitLength="8">61</cs>
+        <end dataType="uint" bitLength="8">22</end>
+      </Dlt645Frame>
+    </xml>
+  </testcase>
+
+  <!-- Test 6: Read Data Request - 0xFF Plain Byte (wraps on +0x33)
+       Address: 112233445566, Control: 0x11 (READ_DATA), Length: 1
+       DataPlain: FF -> Wire: (0xFF+0x33)&0xFF = 0x32
+       CS = 0x68+0x11+0x22+0x33+0x44+0x55+0x66+0x68+0x11+0x01+0x32
+          = 633 mod 256 = 121 = 0x79 -->
+  <testcase>
+    <name>Read Data Request - Length 1 Boundary (0xFF plain)</name>
+    <raw>68112233445566681101327916</raw>
+    <root-type>Dlt645Frame</root-type>
+    <parser-arguments>
+      <response>false</response>
+    </parser-arguments>
+    <xml>
+      <Dlt645Frame>
+        <start1 dataType="uint" bitLength="8">104</start1>
+        <address dataType="byte" bitLength="48">0x112233445566</address>
+        <start2 dataType="uint" bitLength="8">104</start2>
+        <control dataType="uint" bitLength="8" stringRepresentation="READ_DATA">17</control>
+        <length dataType="uint" bitLength="8">1</length>
+        <dataPlain dataType="byte" bitLength="8">0xFF</dataPlain>
+        <cs dataType="uint" bitLength="8">121</cs>
+        <end dataType="uint" bitLength="8">22</end>
+      </Dlt645Frame>
+    </xml>
+  </testcase>
+
+</test:testsuite>

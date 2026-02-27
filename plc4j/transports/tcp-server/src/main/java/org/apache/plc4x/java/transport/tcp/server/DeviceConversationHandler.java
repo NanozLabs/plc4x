@@ -26,7 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
-import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.function.Predicate;
 
@@ -55,8 +55,11 @@ public class DeviceConversationHandler<T> extends ChannelInboundHandlerAdapter {
     public static final AttributeKey<DeviceConversationHandler<?>> HANDLER_KEY =
         AttributeKey.valueOf("plc4x.deviceConversationHandler");
 
-    /** Pending requests waiting for responses, keyed by a unique request ID */
-    private final Map<Integer, PendingRequest<T>> pendingRequests = new ConcurrentHashMap<>();
+    /** The single in-flight request waiting for a response (RTU is half-duplex) */
+    private volatile PendingRequest<T> inFlightRequest;
+
+    /** Queue of requests waiting to be sent */
+    private final Queue<QueuedRequest<T>> requestQueue = new ConcurrentLinkedQueue<>();
 
     private final ScheduledExecutorService timeoutExecutor;
     private Channel channel;
@@ -79,104 +82,121 @@ public class DeviceConversationHandler<T> extends ChannelInboundHandlerAdapter {
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        // Cancel all pending requests
-        for (PendingRequest<T> pending : pendingRequests.values()) {
-            pending.future.completeExceptionally(
-                new TimeoutException("Channel closed before response received"));
-            if (pending.timeoutFuture != null) {
-                pending.timeoutFuture.cancel(false);
+        var ex = new TimeoutException("Channel closed before response received");
+        synchronized (this) {
+            if (inFlightRequest != null) {
+                if (inFlightRequest.timeoutFuture != null) inFlightRequest.timeoutFuture.cancel(false);
+                inFlightRequest.future.completeExceptionally(ex);
+                inFlightRequest = null;
+            }
+            QueuedRequest<T> queued;
+            while ((queued = requestQueue.poll()) != null) {
+                queued.future.completeExceptionally(ex);
             }
         }
-        pendingRequests.clear();
         super.handlerRemoved(ctx);
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        // Try to match against pending requests
-        boolean matched = false;
+        logger.debug("[DeviceConversation] channelRead: msgType={}, queueSize={}", msg.getClass().getSimpleName(), requestQueue.size());
 
-        for (Map.Entry<Integer, PendingRequest<T>> entry : pendingRequests.entrySet()) {
-            PendingRequest<T> pending = entry.getValue();
+        PendingRequest<T> pending;
+        synchronized (this) {
+            pending = inFlightRequest;
+        }
+
+        if (pending != null) {
             try {
-                if (pending.matcher.test((T) msg)) {
-                    pendingRequests.remove(entry.getKey());
-                    if (pending.timeoutFuture != null) {
-                        pending.timeoutFuture.cancel(false);
+                T castMsg = (T) msg;
+                if (pending.matcher.test(castMsg)) {
+                    if (pending.timeoutFuture != null) pending.timeoutFuture.cancel(false);
+                    pending.future.complete(castMsg);
+                    logger.debug("[DeviceConversation] Response matched");
+                    synchronized (this) {
+                        inFlightRequest = null;
                     }
-                    pending.future.complete((T) msg);
-                    matched = true;
-                    logger.trace("Response matched for request ID {}", entry.getKey());
-                    break;
+                    trySendNext();
+                    return;
                 }
             } catch (ClassCastException e) {
-                // Message type doesn't match, continue
+                logger.warn("[DeviceConversation] Type mismatch: {}", msg.getClass().getSimpleName());
             }
         }
 
-        if (!matched) {
-            // Forward unmatched messages to next handler
-            super.channelRead(ctx, msg);
-        }
+        logger.debug("[DeviceConversation] No match, forwarding to next handler");
+        super.channelRead(ctx, msg);
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         logger.error("Exception in device conversation handler", cause);
-        // Fail all pending requests
-        for (PendingRequest<T> pending : pendingRequests.values()) {
-            pending.future.completeExceptionally(cause);
-            if (pending.timeoutFuture != null) {
-                pending.timeoutFuture.cancel(false);
+        synchronized (this) {
+            if (inFlightRequest != null) {
+                if (inFlightRequest.timeoutFuture != null) inFlightRequest.timeoutFuture.cancel(false);
+                inFlightRequest.future.completeExceptionally(cause);
+                inFlightRequest = null;
             }
         }
-        pendingRequests.clear();
+        trySendNext();
         super.exceptionCaught(ctx, cause);
     }
 
     /**
-     * Sends a request to the device and waits for a matching response.
-     *
-     * @param request the request message to send
-     * @param responseMatcher predicate to match the expected response
-     * @param timeout maximum time to wait for response
-     * @return a CompletableFuture that completes with the response
+     * Queues a request and sends it when no other request is in-flight.
+     * RTU is half-duplex: only one request at a time.
      */
     public CompletableFuture<T> sendRequest(T request, Predicate<T> responseMatcher, Duration timeout) {
         if (channel == null || !channel.isActive()) {
-            CompletableFuture<T> future = new CompletableFuture<>();
-            future.completeExceptionally(new IllegalStateException("Channel is not active"));
-            return future;
+            return CompletableFuture.failedFuture(new IllegalStateException("Channel is not active"));
         }
 
-        int requestId = System.identityHashCode(request);
-        CompletableFuture<T> future = new CompletableFuture<>();
+        var future = new CompletableFuture<T>();
+        requestQueue.offer(new QueuedRequest<>(request, responseMatcher, timeout, future));
+        logger.debug("[DeviceConversation] Queued request, queueSize={}", requestQueue.size());
+        trySendNext();
+        return future;
+    }
 
-        PendingRequest<T> pending = new PendingRequest<>(future, responseMatcher);
-        pendingRequests.put(requestId, pending);
+    /** Sends the next queued request if no request is currently in-flight. */
+    private void trySendNext() {
+        QueuedRequest<T> next;
+        synchronized (this) {
+            if (inFlightRequest != null) return;
+            next = requestQueue.poll();
+            if (next == null) return;
+            inFlightRequest = new PendingRequest<>(next.future, next.matcher);
+        }
 
-        // Schedule timeout
-        pending.timeoutFuture = timeoutExecutor.schedule(() -> {
-            PendingRequest<T> removed = pendingRequests.remove(requestId);
-            if (removed != null) {
-                removed.future.completeExceptionally(
-                    new TimeoutException("Request timed out after " + timeout.toMillis() + "ms"));
-            }
-        }, timeout.toMillis(), TimeUnit.MILLISECONDS);
+        logger.debug("[DeviceConversation] Sending next request, remaining={}", requestQueue.size());
 
-        // Send the request
-        channel.writeAndFlush(request).addListener(writeFuture -> {
-            if (!writeFuture.isSuccess()) {
-                PendingRequest<T> removed = pendingRequests.remove(requestId);
-                if (removed != null) {
-                    removed.timeoutFuture.cancel(false);
-                    removed.future.completeExceptionally(writeFuture.cause());
+        // Schedule timeout - on timeout, clear in-flight and try next
+        inFlightRequest.timeoutFuture = timeoutExecutor.schedule(() -> {
+            synchronized (this) {
+                if (inFlightRequest != null && inFlightRequest.future == next.future) {
+                    logger.warn("[DeviceConversation] Request timed out");
+                    inFlightRequest.future.completeExceptionally(
+                        new TimeoutException("Request timed out after " + next.timeout.toMillis() + "ms"));
+                    inFlightRequest = null;
                 }
             }
-        });
+            trySendNext();
+        }, next.timeout.toMillis(), TimeUnit.MILLISECONDS);
 
-        return future;
+        // Write to channel
+        channel.writeAndFlush(next.request).addListener(writeFuture -> {
+            if (!writeFuture.isSuccess()) {
+                synchronized (this) {
+                    if (inFlightRequest != null && inFlightRequest.future == next.future) {
+                        if (inFlightRequest.timeoutFuture != null) inFlightRequest.timeoutFuture.cancel(false);
+                        inFlightRequest.future.completeExceptionally(writeFuture.cause());
+                        inFlightRequest = null;
+                    }
+                }
+                trySendNext();
+            }
+        });
     }
 
     /**
@@ -216,11 +236,26 @@ public class DeviceConversationHandler<T> extends ChannelInboundHandlerAdapter {
     private static class PendingRequest<T> {
         final CompletableFuture<T> future;
         final Predicate<T> matcher;
-        ScheduledFuture<?> timeoutFuture;
+        volatile ScheduledFuture<?> timeoutFuture;
 
         PendingRequest(CompletableFuture<T> future, Predicate<T> matcher) {
             this.future = future;
             this.matcher = matcher;
+        }
+    }
+
+    /** A request waiting in the queue to be sent. */
+    private static class QueuedRequest<T> {
+        final T request;
+        final Predicate<T> matcher;
+        final Duration timeout;
+        final CompletableFuture<T> future;
+
+        QueuedRequest(T request, Predicate<T> matcher, Duration timeout, CompletableFuture<T> future) {
+            this.request = request;
+            this.matcher = matcher;
+            this.timeout = timeout;
+            this.future = future;
         }
     }
 }

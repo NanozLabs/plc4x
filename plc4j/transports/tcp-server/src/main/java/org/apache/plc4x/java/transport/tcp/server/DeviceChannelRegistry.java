@@ -101,6 +101,16 @@ public class DeviceChannelRegistry {
             return channel.isActive();
         }
 
+        public long getBytesReceived() {
+            var tracker = channel.attr(BytesTrackingHandler.BYTES_TRACKER_KEY).get();
+            return tracker != null ? tracker.getBytesReceived() : 0;
+        }
+
+        public long getBytesSent() {
+            var tracker = channel.attr(BytesTrackingHandler.BYTES_TRACKER_KEY).get();
+            return tracker != null ? tracker.getBytesSent() : 0;
+        }
+
         @Override
         public String toString() {
             return String.format("DeviceInfo{id='%s', remote=%s, active=%s, since=%s}",

@@ -179,7 +179,7 @@ public class RegistrationHandler extends ChannelInboundHandlerAdapter {
         switch (regResult) {
             case SUCCESS:
             case REPLACED:
-                completeRegistration(ctx, deviceId, result.getConsumedBytes());
+                completeRegistration(ctx, deviceId);
                 break;
 
             case REJECTED:
@@ -197,7 +197,7 @@ public class RegistrationHandler extends ChannelInboundHandlerAdapter {
     /**
      * Completes the registration process.
      */
-    private void completeRegistration(ChannelHandlerContext ctx, String deviceId, int consumedBytes) {
+    private void completeRegistration(ChannelHandlerContext ctx, String deviceId) {
         registrationComplete = true;
 
         // Store device ID as channel attribute for later reference
@@ -208,8 +208,8 @@ public class RegistrationHandler extends ChannelInboundHandlerAdapter {
             onRegistrationComplete.accept(ctx, deviceId);
         }
 
-        // Skip the consumed registration bytes
-        accumulatedBuffer.skipBytes(consumedBytes);
+        // Note: parser already advanced readerIndex by consumedBytes via readBytes(),
+        // so no skipBytes() needed here.
 
         // Forward any remaining data in the buffer before removing handler
         ByteBuf remaining = null;

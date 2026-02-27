@@ -89,6 +89,9 @@ public class TcpServerChannelFactory implements ChannelFactory, HasConfiguration
     /** Attribute key for storing registration time */
     public static final AttributeKey<Long> REGISTRATION_TIME_KEY = AttributeKey.valueOf("plc4x.registrationTime");
 
+    /** Attribute key for storing device registry on the server channel */
+    public static final AttributeKey<DeviceChannelRegistry> DEVICE_REGISTRY_KEY = AttributeKey.valueOf("plc4x.deviceRegistry");
+
     private final SocketAddress bindAddress;
     private TcpServerTransportConfiguration configuration;
 
@@ -212,6 +215,7 @@ public class TcpServerChannelFactory implements ChannelFactory, HasConfiguration
             // ChannelFuture bindFuture = bootstrap.bind(502).sync();
             ChannelFuture bindFuture = bootstrap.bind(bindAddress).sync();
             serverChannel = bindFuture.channel();
+            serverChannel.attr(DEVICE_REGISTRY_KEY).set(deviceRegistry);
 
             logger.info("TCP Server started on {}", bindAddress);
 
@@ -236,6 +240,11 @@ public class TcpServerChannelFactory implements ChannelFactory, HasConfiguration
 
         logger.debug("Initializing child channel from {}", ch.remoteAddress());
 
+        // 字节统计 handler（必须在最前面，统计原始字节）
+        var bytesTracker = new BytesTrackingHandler();
+        pipeline.addLast("bytesTracker", bytesTracker);
+        ch.attr(BytesTrackingHandler.BYTES_TRACKER_KEY).set(bytesTracker);
+
         // Add idle state handler if configured
         if (configuration.getIdleTimeout() > 0) {
             pipeline.addLast("idleHandler",
@@ -259,21 +268,44 @@ public class TcpServerChannelFactory implements ChannelFactory, HasConfiguration
         Channel channel = ctx.channel();
         channel.attr(REGISTRATION_TIME_KEY).set(System.currentTimeMillis());
 
-        logger.info("Device '{}' registered, installing protocol handlers", deviceId);
+        logger.info("Device '{}' registered, installing protocol handlers. Pipeline before: {}", deviceId, ctx.pipeline().names());
 
-        // Add the device conversation handler for request-response management
-        ctx.pipeline().addLast("deviceConversation", new DeviceConversationHandler<>());
-
-        // Install the protocol handler provided by the driver
+        // Install the protocol handler first (ChannelInitializer adds codec + Plc4xNettyWrapper)
         if (protocolHandlerProvider != null) {
-            // The protocol handler is a ChannelInitializer that sets up the full pipeline
             ctx.pipeline().addLast(protocolHandlerProvider);
+        }
+
+        logger.info("Device '{}' pipeline after protocol install: {}", deviceId, ctx.pipeline().names());
+
+        // Insert DeviceConversationHandler AFTER the codec so it receives decoded messages,
+        // not raw ByteBuf. Find the codec by type and insert after it.
+        String codecHandlerName = findCodecHandlerName(ctx.pipeline());
+        if (codecHandlerName != null) {
+            ctx.pipeline().addAfter(codecHandlerName, "deviceConversation", new DeviceConversationHandler<>());
+            logger.info("Device '{}' DeviceConversationHandler inserted after codec '{}'. Final pipeline: {}", deviceId, codecHandlerName, ctx.pipeline().names());
+        } else {
+            // Fallback: add at end (may not work correctly but avoids NPE)
+            logger.warn("Could not find codec handler in pipeline for device '{}', adding DeviceConversationHandler at end. Pipeline: {}", deviceId, ctx.pipeline().names());
+            ctx.pipeline().addLast("deviceConversation", new DeviceConversationHandler<>());
         }
 
         // Notify callback
         if (onDeviceConnected != null) {
             onDeviceConnected.accept(channel);
         }
+    }
+
+    /**
+     * Finds the name of the byte-to-message codec handler in the pipeline.
+     */
+    private String findCodecHandlerName(ChannelPipeline pipeline) {
+        for (Map.Entry<String, ChannelHandler> entry : pipeline) {
+            if (entry.getValue().getClass().getSimpleName().contains("GeneratedProtocolMessageCodec")
+                || entry.getValue().getClass().getSimpleName().contains("GeneratedDriverByteToMessageCodec")) {
+                return entry.getKey();
+            }
+        }
+        return null;
     }
 
     @Override

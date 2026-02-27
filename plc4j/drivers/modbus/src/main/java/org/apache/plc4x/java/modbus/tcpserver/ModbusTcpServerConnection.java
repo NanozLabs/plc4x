@@ -30,28 +30,9 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /**
- * Helper class for accessing Modbus TCP Server specific functionality.
+ * Helper class for accessing Modbus Server specific functionality.
  *
- * <p>This class provides a convenient API for managing device connections
- * in server mode, including event subscriptions and device status queries.</p>
- *
- * <h3>Usage Example:</h3>
- * <pre>{@code
- * PlcConnection connection = PlcDriverManager.getConnection("modbus-tcp-server:tcpserver://0.0.0.0:502");
- * ModbusTcpServerConnection serverConnection = ModbusTcpServerConnection.of(connection);
- *
- * // Subscribe to device events
- * serverConnection.onDeviceConnected(event -> {
- *     System.out.println("Device connected: " + event.getDeviceId());
- * });
- *
- * serverConnection.onDeviceDisconnected(event -> {
- *     System.out.println("Device disconnected: " + event.getDeviceId());
- * });
- *
- * // Query connected devices
- * Set<String> devices = serverConnection.getConnectedDevices();
- * }</pre>
+ * <p>Supports both Modbus TCP Server and Modbus RTU Server connections.</p>
  *
  * @since 0.14.0
  */
@@ -77,16 +58,15 @@ public class ModbusTcpServerConnection {
         if (!(connection instanceof DefaultNettyPlcConnection)) {
             throw new PlcRuntimeException(
                 "Connection is not a DefaultNettyPlcConnection. " +
-                "Make sure you're using a modbus-tcp-server:// connection URL.");
+                "Make sure you're using a modbus-tcp-server:// or modbus-rtu-server:// connection URL.");
         }
 
         DefaultNettyPlcConnection nettyConnection = (DefaultNettyPlcConnection) connection;
 
-        // For server mode, get DeviceChannelRegistry from TcpServerChannelFactory
         if (!(nettyConnection.getChannelFactory() instanceof TcpServerChannelFactory)) {
             throw new PlcRuntimeException(
                 "Connection is not using TcpServerChannelFactory. " +
-                "Make sure you're using a modbus-tcp-server:// connection URL.");
+                "Make sure you're using a modbus-tcp-server:// or modbus-rtu-server:// connection URL.");
         }
 
         TcpServerChannelFactory channelFactory = (TcpServerChannelFactory) nettyConnection.getChannelFactory();
@@ -104,6 +84,15 @@ public class ModbusTcpServerConnection {
      */
     public PlcConnection getConnection() {
         return connection;
+    }
+
+    /**
+     * Gets the device channel registry.
+     *
+     * @return the device registry
+     */
+    public DeviceChannelRegistry getDeviceRegistry() {
+        return deviceRegistry;
     }
 
     // ========================================

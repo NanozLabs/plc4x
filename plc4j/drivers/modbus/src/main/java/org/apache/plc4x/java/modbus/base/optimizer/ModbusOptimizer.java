@@ -129,16 +129,16 @@ public class ModbusOptimizer extends SingleTagOptimizer {
             subRequests.addAll(processCoilRequests(coils, reader, modbusContext));
         }
         if (holdingRegisters != null) {
-            subRequests.addAll(processRegisterRequests(holdingRegisters, reader, (address, count, dataType) -> new ModbusTagHoldingRegister(address, count, dataType, Collections.emptyMap()), modbusContext));
+            subRequests.addAll(processRegisterRequests(holdingRegisters, reader, (address, count, dataType, config) -> new ModbusTagHoldingRegister(address, count, dataType, config), modbusContext));
         }
         if (inputRegisters != null) {
-            subRequests.addAll(processRegisterRequests(inputRegisters, reader, (address, count, dataType) -> new ModbusTagInputRegister(address, count, dataType, Collections.emptyMap()), modbusContext));
+            subRequests.addAll(processRegisterRequests(inputRegisters, reader, (address, count, dataType, config) -> new ModbusTagInputRegister(address, count, dataType, config), modbusContext));
         }
         if (extendedRegisters != null) {
-            subRequests.addAll(processRegisterRequests(extendedRegisters, reader, (address, count, dataType) -> new ModbusTagExtendedRegister(address, count, dataType, Collections.emptyMap()), modbusContext));
+            subRequests.addAll(processRegisterRequests(extendedRegisters, reader, (address, count, dataType, config) -> new ModbusTagExtendedRegister(address, count, dataType, config), modbusContext));
         }
         if (discreteInputs != null) {
-            subRequests.addAll(processRegisterRequests(discreteInputs, reader, (address, count, dataType) -> new ModbusTagDiscreteInput(address, count, dataType, Collections.emptyMap()), modbusContext));
+            subRequests.addAll(processRegisterRequests(discreteInputs, reader, (address, count, dataType, config) -> new ModbusTagDiscreteInput(address, count, dataType, config), modbusContext));
         }
         return subRequests;
     }
@@ -276,7 +276,7 @@ public class ModbusOptimizer extends SingleTagOptimizer {
             } catch (SerializationException ex) {
                 throw new RuntimeException(ex);
             }
-            return null;
+            throw new RuntimeException("Error processing Modbus read response", e);
         }
     }
 
@@ -289,6 +289,8 @@ public class ModbusOptimizer extends SingleTagOptimizer {
         int firstCoil = -1;
         int lastCoil = -1;
         int maxCoilCurRequest = -1;
+        // 保留首个 tag 的 config（含 device-id 等路由参数）
+        Map<String, String> groupConfig = Collections.emptyMap();
         for (ModbusTag tag : tags) {
             int sizeInCoils = tag.getDataType().getDataTypeSize() * 8;
             if (tag.getDataType() == ModbusDataType.BOOL) {
@@ -300,6 +302,7 @@ public class ModbusOptimizer extends SingleTagOptimizer {
                 lastCoil = tag.getAddress() + (sizeInCoils * tag.getNumberOfElements());
                 // 2000 coils/request is the modbus limit.
                 maxCoilCurRequest = tag.getAddress() + modbusContext.getMaxCoilsPerRequest();
+                groupConfig = tag.getConfig();
             }
 
             // If adding the current coil would exceed the maximum number of coils that can be read by one request,
@@ -307,13 +310,14 @@ public class ModbusOptimizer extends SingleTagOptimizer {
             if (tag.getAddress() + (sizeInCoils * tag.getNumberOfElements()) > maxCoilCurRequest) {
                 // Finish the current sub-request
                 LinkedHashMap<String, PlcTagItem<PlcTag>> subTags = new LinkedHashMap<>();
-                subTags.put("coils" + subRequests.size(), new DefaultPlcTagItem<>(new ModbusTagCoil(firstCoil, lastCoil - firstCoil, ModbusDataType.BYTE, Collections.emptyMap())));
+                subTags.put("coils" + subRequests.size(), new DefaultPlcTagItem<>(new ModbusTagCoil(firstCoil, lastCoil - firstCoil, ModbusDataType.BYTE, groupConfig)));
                 subRequests.add(new DefaultPlcReadRequest(reader, subTags));
 
                 // Re-initialize the structures for the next request.
                 firstCoil = tag.getAddress();
                 lastCoil = tag.getAddress() + (sizeInCoils * tag.getNumberOfElements());
                 maxCoilCurRequest = tag.getAddress() + modbusContext.getMaxCoilsPerRequest();
+                groupConfig = tag.getConfig();
             }
             // Otherwise update the end-marker for the current block.
             else {
@@ -323,7 +327,7 @@ public class ModbusOptimizer extends SingleTagOptimizer {
 
         // Finish the last sub-request
         LinkedHashMap<String, PlcTagItem<PlcTag>> subTags = new LinkedHashMap<>();
-        subTags.put("coils" + subRequests.size(), new DefaultPlcTagItem<>(new ModbusTagCoil(firstCoil, lastCoil - firstCoil, ModbusDataType.BYTE, Collections.emptyMap())));
+        subTags.put("coils" + subRequests.size(), new DefaultPlcTagItem<>(new ModbusTagCoil(firstCoil, lastCoil - firstCoil, ModbusDataType.BYTE, groupConfig)));
         subRequests.add(new DefaultPlcReadRequest(reader, subTags));
         return subRequests;
     }
@@ -333,28 +337,28 @@ public class ModbusOptimizer extends SingleTagOptimizer {
         int firstRegister = -1;
         int lastRegister = -1;
         int maxRegisterCurRequest = -1;
+        Map<String, String> groupConfig = Collections.emptyMap();
         for (ModbusTag tag : tags) {
             int sizeInRegisters = (int) Math.ceil((double) tag.getDataType().getDataTypeSize() / 2);
             // Initialize for the first item.
             if (firstRegister == -1) {
                 firstRegister = tag.getAddress();
                 lastRegister = tag.getAddress() + (sizeInRegisters * tag.getNumberOfElements());
-                // 2000 coils/request is the modbus limit.
                 maxRegisterCurRequest = tag.getAddress() + modbusContext.getMaxRegistersPerRequest();
+                groupConfig = tag.getConfig();
             }
 
-            // If adding the current coil would exceed the maximum number of coils that can be read by one request,
-            // finish this one and start a new one.
             if (tag.getAddress() + (sizeInRegisters * tag.getNumberOfElements()) > maxRegisterCurRequest) {
                 // Finish the current sub-request
                 LinkedHashMap<String, PlcTagItem<PlcTag>> subTags = new LinkedHashMap<>();
-                subTags.put("registers" + subRequests.size(), new DefaultPlcTagItem<>(tagFactory.createTag(firstRegister, lastRegister - firstRegister, ModbusDataType.WORD)));
+                subTags.put("registers" + subRequests.size(), new DefaultPlcTagItem<>(tagFactory.createTag(firstRegister, lastRegister - firstRegister, ModbusDataType.WORD, groupConfig)));
                 subRequests.add(new DefaultPlcReadRequest(reader, subTags));
 
                 // Re-initialize the structures for the next request.
                 firstRegister = tag.getAddress();
                 lastRegister = tag.getAddress() + (sizeInRegisters * tag.getNumberOfElements());
                 maxRegisterCurRequest = tag.getAddress() + modbusContext.getMaxRegistersPerRequest();
+                groupConfig = tag.getConfig();
             }
             // Otherwise update the end-marker for the current block.
             else {
@@ -364,7 +368,7 @@ public class ModbusOptimizer extends SingleTagOptimizer {
 
         // Finish the last sub-request
         LinkedHashMap<String, PlcTagItem<PlcTag>> subTags = new LinkedHashMap<>();
-        subTags.put("registers" + subRequests.size(), new DefaultPlcTagItem<>(tagFactory.createTag(firstRegister, lastRegister - firstRegister, ModbusDataType.WORD)));
+        subTags.put("registers" + subRequests.size(), new DefaultPlcTagItem<>(tagFactory.createTag(firstRegister, lastRegister - firstRegister, ModbusDataType.WORD, groupConfig)));
         subRequests.add(new DefaultPlcReadRequest(reader, subTags));
         return subRequests;
     }
@@ -414,7 +418,7 @@ public class ModbusOptimizer extends SingleTagOptimizer {
     }
 
     protected interface TagFactory {
-        PlcTag createTag(int address, int count, ModbusDataType dataType);
+        PlcTag createTag(int address, int count, ModbusDataType dataType, Map<String, String> config);
     }
 
     private ReadBuffer getReadBuffer(byte[] data, ModbusByteOrder byteOrder) {

@@ -49,6 +49,7 @@ public abstract class ModbusTag implements PlcTag, Serializable {
     private final Short unitId;
     private final ModbusByteOrder byteOrder;
     private final String deviceId;
+    private final Map<String, String> config;
 
     public static ModbusTag of(String addressString) {
         if (ModbusTagCoil.matches(addressString)) {
@@ -112,6 +113,11 @@ public abstract class ModbusTag implements PlcTag, Serializable {
             this.byteOrder = null;
         }
         this.deviceId = config.get("device-id");
+        this.config = config;
+    }
+
+    public Map<String, String> getConfig() {
+        return config;
     }
 
     /**

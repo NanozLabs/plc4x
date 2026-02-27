@@ -16,20 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.plc4x.java.modbus.tcpserver.protocol;
+package org.apache.plc4x.java.modbus.rtuserver.protocol;
 
 import io.netty.channel.Channel;
 import org.apache.plc4x.java.api.exceptions.PlcRuntimeException;
 import org.apache.plc4x.java.api.messages.*;
-import org.apache.plc4x.java.api.model.PlcTag;
 import org.apache.plc4x.java.api.types.PlcResponseCode;
 import org.apache.plc4x.java.api.value.PlcValue;
 import org.apache.plc4x.java.modbus.base.protocol.ModbusProtocolLogic;
 import org.apache.plc4x.java.modbus.base.tag.ModbusTag;
 import org.apache.plc4x.java.modbus.base.tag.ModbusTagHandler;
 import org.apache.plc4x.java.modbus.readwrite.*;
-import org.apache.plc4x.java.modbus.tcpserver.config.ModbusTcpServerConfiguration;
-import org.apache.plc4x.java.modbus.tcpserver.context.ModbusTcpServerContext;
+import org.apache.plc4x.java.modbus.rtuserver.config.ModbusRtuServerConfiguration;
+import org.apache.plc4x.java.modbus.rtuserver.context.ModbusRtuServerContext;
 import org.apache.plc4x.java.modbus.types.ModbusByteOrder;
 import org.apache.plc4x.java.spi.ConversationContext;
 import org.apache.plc4x.java.spi.configuration.HasConfiguration;
@@ -50,43 +49,26 @@ import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Protocol logic for Modbus TCP Server mode.
+ * Protocol logic for Modbus RTU Server mode (RTU over TCP).
  *
- * <p>This protocol logic extends the standard Modbus TCP protocol logic to support
- * server mode operations, where DTU devices connect to the server. The key differences
- * from client mode are:</p>
- *
- * <ul>
- *   <li>Multiple device connections managed through DeviceChannelRegistry</li>
- *   <li>Device ID based routing for read/write operations</li>
- *   <li>Tag-based device addressing using device-id config parameter</li>
- * </ul>
- *
- * <h3>Device Addressing:</h3>
- * <p>In server mode, specify the target device in the tag address:</p>
- * <pre>
- * holding-register:1:INT{device-id:"DEVICE001"}
- * </pre>
- *
- * <p>Alternatively, set a default target device via the {@code target-device-id}
- * configuration parameter in the connection URL.</p>
- *
- * @since 0.14.0
+ * <p>Uses ModbusRtuADU framing (address + PDU + CRC) instead of ModbusTcpADU
+ * (MBAP header). This is required for DTU devices that speak Modbus RTU
+ * transparently over TCP connections.</p>
  */
-public class ModbusTcpServerProtocolLogic extends ModbusProtocolLogic<ModbusTcpADU>
-    implements HasConfiguration<ModbusTcpServerConfiguration> {
+public class ModbusRtuServerProtocolLogic extends ModbusProtocolLogic<ModbusRtuADU>
+    implements HasConfiguration<ModbusRtuServerConfiguration> {
 
-    private static final Logger logger = LoggerFactory.getLogger(ModbusTcpServerProtocolLogic.class);
+    private static final Logger logger = LoggerFactory.getLogger(ModbusRtuServerProtocolLogic.class);
 
-    private ModbusTcpServerConfiguration configuration;
-    private ModbusTcpServerContext serverContext;
+    private ModbusRtuServerConfiguration configuration;
+    private ModbusRtuServerContext serverContext;
 
-    public ModbusTcpServerProtocolLogic() {
-        super(DriverType.MODBUS_TCP);
+    public ModbusRtuServerProtocolLogic() {
+        super(DriverType.MODBUS_RTU);
     }
 
     @Override
-    public void setConfiguration(ModbusTcpServerConfiguration configuration) {
+    public void setConfiguration(ModbusRtuServerConfiguration configuration) {
         this.configuration = configuration;
         this.requestTimeout = Duration.ofMillis(configuration.getRequestTimeout());
         this.unitIdentifier = (short) configuration.getDefaultUnitIdentifier();
@@ -98,15 +80,14 @@ public class ModbusTcpServerProtocolLogic extends ModbusProtocolLogic<ModbusTcpA
     @Override
     public void setDriverContext(DriverContext driverContext) {
         super.setDriverContext(driverContext);
-        if (driverContext instanceof ModbusTcpServerContext) {
-            this.serverContext = (ModbusTcpServerContext) driverContext;
+        if (driverContext instanceof ModbusRtuServerContext) {
+            this.serverContext = (ModbusRtuServerContext) driverContext;
         }
     }
 
     @Override
-    public void onConnect(ConversationContext<ModbusTcpADU> context) {
+    public void onConnect(ConversationContext<ModbusRtuADU> context) {
         super.onConnect(context);
-        // 从 server channel attribute 获取 DeviceChannelRegistry 注入到 serverContext
         if (serverContext != null && serverContext.getDeviceRegistry() == null) {
             Channel channel = context.getChannel();
             if (channel.parent() != null) {
@@ -117,7 +98,7 @@ public class ModbusTcpServerProtocolLogic extends ModbusProtocolLogic<ModbusTcpA
                 serverContext.setDeviceRegistry(registry);
             }
         }
-        logger.info("ModbusTcpServerProtocolLogic connected in server mode");
+        logger.info("ModbusRtuServerProtocolLogic connected in server mode");
     }
 
     @Override
@@ -126,38 +107,21 @@ public class ModbusTcpServerProtocolLogic extends ModbusProtocolLogic<ModbusTcpA
     }
 
     @Override
-    public void close(ConversationContext<ModbusTcpADU> context) {
+    public void close(ConversationContext<ModbusRtuADU> context) {
         if (tm != null) {
             tm.shutdown();
         }
     }
 
-    /**
-     * Resolves the target device ID from tag and configuration.
-     *
-     * <p>Priority order:</p>
-     * <ol>
-     *   <li>Device ID specified in tag: {@code holding-register:1:INT{device-id:"DEV001"}}</li>
-     *   <li>Default device ID from configuration: {@code target-device-id=DEV001}</li>
-     * </ol>
-     *
-     * @param tag the Modbus tag
-     * @return the resolved device ID
-     * @throws PlcRuntimeException if no device ID can be resolved
-     */
     private String resolveDeviceId(ModbusTag tag) {
-        // First check tag-level device ID
         String tagDeviceId = tag.getDeviceId();
         if (tagDeviceId != null && !tagDeviceId.isBlank()) {
             return tagDeviceId;
         }
-
-        // Fall back to configured default
         String configDeviceId = configuration.getTargetDeviceId();
         if (configDeviceId != null && !configDeviceId.isBlank()) {
             return configDeviceId;
         }
-
         throw new PlcRuntimeException(
             "No target device specified. Use tag config {device-id:\"..\"} or set target-device-id parameter.");
     }
@@ -166,7 +130,6 @@ public class ModbusTcpServerProtocolLogic extends ModbusProtocolLogic<ModbusTcpA
         if (serverContext != null && serverContext.getDeviceRegistry() != null) {
             return serverContext.getDeviceRegistry();
         }
-        // 延迟从 server channel attribute 获取 registry
         if (conversationContext != null && serverContext != null) {
             Channel ch = conversationContext.getChannel();
             if (ch.parent() != null) {
@@ -181,32 +144,20 @@ public class ModbusTcpServerProtocolLogic extends ModbusProtocolLogic<ModbusTcpA
         return null;
     }
 
-    /**
-     * Gets the channel for a specific device.
-     *
-     * @param deviceId the device identifier
-     * @return the channel
-     * @throws PlcRuntimeException if device is not connected
-     */
     private Channel getDeviceChannel(String deviceId) {
         DeviceChannelRegistry registry = getDeviceRegistry();
         if (registry == null) {
             throw new PlcRuntimeException("Device registry not available");
         }
-
         Channel channel = registry.getChannel(deviceId);
         if (channel == null || !channel.isActive()) {
             throw new PlcRuntimeException("Device not connected: " + deviceId);
         }
-
         return channel;
     }
 
-    /**
-     * Gets the conversation handler for a device channel.
-     */
-    private DeviceConversationHandler<ModbusTcpADU> getDeviceHandler(Channel channel) {
-        DeviceConversationHandler<ModbusTcpADU> handler = DeviceConversationHandler.getFromChannel(channel);
+    private DeviceConversationHandler<ModbusRtuADU> getDeviceHandler(Channel channel) {
+        DeviceConversationHandler<ModbusRtuADU> handler = DeviceConversationHandler.getFromChannel(channel);
         if (handler == null) {
             throw new PlcRuntimeException("Device conversation handler not found on channel");
         }
@@ -216,24 +167,17 @@ public class ModbusTcpServerProtocolLogic extends ModbusProtocolLogic<ModbusTcpA
     @Override
     public CompletableFuture<PlcPingResponse> ping(PlcPingRequest pingRequest) {
         CompletableFuture<PlcPingResponse> future = new CompletableFuture<>();
-
         try {
             String deviceId = resolveDeviceId((ModbusTag) pingAddress);
             Channel deviceChannel = getDeviceChannel(deviceId);
-            DeviceConversationHandler<ModbusTcpADU> handler = getDeviceHandler(deviceChannel);
+            DeviceConversationHandler<ModbusRtuADU> handler = getDeviceHandler(deviceChannel);
 
             ModbusPDU readRequestPdu = getReadRequestPdu(pingAddress);
             final short unitId = getUnitId(pingAddress);
-            int transactionIdentifier = transactionIdentifierGenerator.getAndIncrement();
-            if (transactionIdentifierGenerator.get() == 0xFFFF) {
-                transactionIdentifierGenerator.set(1);
-            }
+            ModbusRtuADU modbusRtuADU = new ModbusRtuADU(unitId, readRequestPdu);
 
-            ModbusTcpADU modbusTcpADU = new ModbusTcpADU(transactionIdentifier, unitId, readRequestPdu);
-
-            handler.sendRequest(modbusTcpADU,
-                    response -> response.getTransactionIdentifier() == transactionIdentifier
-                        && response.getUnitIdentifier() == unitId,
+            handler.sendRequest(modbusRtuADU,
+                    response -> response.getAddress() == unitId,
                     requestTimeout)
                 .whenComplete((response, error) -> {
                     if (error != null) {
@@ -242,11 +186,9 @@ public class ModbusTcpServerProtocolLogic extends ModbusProtocolLogic<ModbusTcpA
                         future.complete(new DefaultPlcPingResponse(pingRequest, PlcResponseCode.OK));
                     }
                 });
-
         } catch (PlcRuntimeException e) {
             future.completeExceptionally(e);
         }
-
         return future;
     }
 
@@ -264,26 +206,18 @@ public class ModbusTcpServerProtocolLogic extends ModbusProtocolLogic<ModbusTcpA
             String tagName = request.getTagNames().iterator().next();
             ModbusTag tag = (ModbusTag) request.getTag(tagName);
 
-            // Resolve target device from tag or configuration
             String deviceId = resolveDeviceId(tag);
             Channel deviceChannel = getDeviceChannel(deviceId);
-            DeviceConversationHandler<ModbusTcpADU> handler = getDeviceHandler(deviceChannel);
+            DeviceConversationHandler<ModbusRtuADU> handler = getDeviceHandler(deviceChannel);
 
             logger.debug("Reading from device '{}': {}", deviceId, tag);
 
             final ModbusPDU requestPdu = getReadRequestPdu(tag);
             final short unitId = getUnitId(tag);
+            ModbusRtuADU modbusRtuADU = new ModbusRtuADU(unitId, requestPdu);
 
-            int transactionIdentifier = transactionIdentifierGenerator.getAndIncrement();
-            if (transactionIdentifierGenerator.get() == 0xFFFF) {
-                transactionIdentifierGenerator.set(1);
-            }
-
-            ModbusTcpADU modbusTcpADU = new ModbusTcpADU(transactionIdentifier, unitId, requestPdu);
-
-            handler.sendRequest(modbusTcpADU,
-                    response -> response.getTransactionIdentifier() == transactionIdentifier
-                        && response.getUnitIdentifier() == unitId,
+            handler.sendRequest(modbusRtuADU,
+                    response -> response.getAddress() == unitId,
                     requestTimeout)
                 .whenComplete((response, error) -> {
                     if (error != null) {
@@ -313,14 +247,12 @@ public class ModbusTcpServerProtocolLogic extends ModbusProtocolLogic<ModbusTcpA
 
                     PlcReadResponse plcResponse = new DefaultPlcReadResponse(request,
                         Collections.singletonMap(tagName, new DefaultPlcResponseItem<>(responseCode, plcValue)));
-
                     future.complete(plcResponse);
                 });
 
         } catch (PlcRuntimeException e) {
             future.completeExceptionally(e);
         }
-
         return future;
     }
 
@@ -338,25 +270,18 @@ public class ModbusTcpServerProtocolLogic extends ModbusProtocolLogic<ModbusTcpA
             String tagName = request.getTagNames().iterator().next();
             ModbusTag tag = (ModbusTag) request.getTag(tagName);
 
-            // Resolve target device from tag or configuration
             String deviceId = resolveDeviceId(tag);
             Channel deviceChannel = getDeviceChannel(deviceId);
-            DeviceConversationHandler<ModbusTcpADU> handler = getDeviceHandler(deviceChannel);
+            DeviceConversationHandler<ModbusRtuADU> handler = getDeviceHandler(deviceChannel);
 
             logger.debug("Writing to device '{}': {}", deviceId, tag);
 
             final ModbusPDU requestPdu = getWriteRequestPdu(tag, writeRequest.getPlcValue(tagName));
             final short unitId = getUnitId(tag);
+            ModbusRtuADU modbusRtuADU = new ModbusRtuADU(unitId, requestPdu);
 
-            int transactionIdentifier = transactionIdentifierGenerator.getAndIncrement();
-            if (transactionIdentifierGenerator.get() == 0xFFFF) {
-                transactionIdentifierGenerator.set(1);
-            }
-
-            ModbusTcpADU modbusTcpADU = new ModbusTcpADU(transactionIdentifier, unitId, requestPdu);
-
-            handler.sendRequest(modbusTcpADU,
-                    response -> response.getTransactionIdentifier() == transactionIdentifier,
+            handler.sendRequest(modbusRtuADU,
+                    response -> response.getAddress() == unitId,
                     requestTimeout)
                 .whenComplete((response, error) -> {
                     if (error != null) {
@@ -383,43 +308,25 @@ public class ModbusTcpServerProtocolLogic extends ModbusProtocolLogic<ModbusTcpA
 
                     PlcWriteResponse plcResponse = new DefaultPlcWriteResponse(request,
                         Collections.singletonMap(tagName, responseCode));
-
                     future.complete(plcResponse);
                 });
 
         } catch (PlcRuntimeException e) {
             future.completeExceptionally(e);
         }
-
         return future;
     }
 
-    /**
-     * Gets the count of currently connected devices.
-     *
-     * @return the number of connected devices
-     */
     public int getConnectedDeviceCount() {
         DeviceChannelRegistry registry = getDeviceRegistry();
         return registry != null ? registry.getDeviceCount() : 0;
     }
 
-    /**
-     * Checks if a specific device is connected.
-     *
-     * @param deviceId the device identifier
-     * @return true if the device is connected
-     */
     public boolean isDeviceConnected(String deviceId) {
         DeviceChannelRegistry registry = getDeviceRegistry();
         return registry != null && registry.isRegistered(deviceId);
     }
 
-    /**
-     * Gets the device registry for advanced operations.
-     *
-     * @return the device registry, or null if not available
-     */
     public DeviceChannelRegistry getPublicDeviceRegistry() {
         return getDeviceRegistry();
     }
