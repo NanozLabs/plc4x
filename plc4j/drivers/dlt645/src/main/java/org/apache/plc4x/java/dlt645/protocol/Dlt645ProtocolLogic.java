@@ -42,6 +42,7 @@ import org.apache.plc4x.java.spi.messages.utils.DefaultPlcResponseItem;
 import org.apache.plc4x.java.spi.transaction.RequestTransactionManager;
 import org.apache.plc4x.java.spi.values.PlcLREAL;
 import org.apache.plc4x.java.spi.values.PlcSTRING;
+import org.apache.plc4x.java.spi.values.PlcStruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +50,7 @@ import java.io.ByteArrayOutputStream;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -656,6 +658,9 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
     /**
      * Parse response data: DI(4 bytes, reversed) + value data.
      * Verifies DI echo, then delegates to semantic decoding.
+     * <p>
+     * For wildcard DI (containing 0xFF), parses concatenated sub-values
+     * and returns a PlcStruct keyed by each sub-item's DI hex string.
      */
     private PlcValue parseResponseData(byte[] dataPlain, Dlt645Tag tag) {
         if (dataPlain == null || dataPlain.length < 4) {
@@ -679,7 +684,48 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
 
         var valueData = new byte[dataPlain.length - 4];
         System.arraycopy(dataPlain, 4, valueData, 0, valueData.length);
+
+        // Wildcard DI: parse concatenated sub-values into a PlcStruct
+        if (DataIdentifiers.containsWildcard(diHex)) {
+            return parseWildcardResponseData(diHex, valueData);
+        }
+
         return new PlcLREAL(DataIdentifiers.decodeValue(diHex, valueData));
+    }
+
+    /**
+     * Parse wildcard response: concatenated BCD values for all sub-items.
+     * <p>
+     * DL/T 645-2007 wildcard response format: values are concatenated in ascending
+     * order of the wildcard byte, each value's length is determined by DataIdentifiers.
+     *
+     * @param wildcardDiHex wildcard DI hex string (e.g. "0201FF00")
+     * @param valueData     concatenated BCD value bytes (LSB first per sub-item)
+     * @return PlcStruct mapping each sub-item's DI hex to its decoded PlcLREAL value
+     */
+    private PlcValue parseWildcardResponseData(String wildcardDiHex, byte[] valueData) {
+        var subItems = DataIdentifiers.getSubItems(wildcardDiHex);
+        if (subItems.isEmpty()) {
+            logger.warn("No sub-items found for wildcard DI: {}", wildcardDiHex);
+            return new PlcSTRING("");
+        }
+
+        var map = new LinkedHashMap<String, PlcValue>();
+        int offset = 0;
+        for (var subItem : subItems) {
+            if (offset + subItem.getDataLength() > valueData.length) {
+                logger.debug("Wildcard response truncated at offset {}/{} for sub-item {}",
+                    offset, valueData.length, subItem.getDi());
+                break;
+            }
+            var subData = new byte[subItem.getDataLength()];
+            System.arraycopy(valueData, offset, subData, 0, subItem.getDataLength());
+            map.put(subItem.getDi().toUpperCase(),
+                new PlcLREAL(DataIdentifiers.decodeValue(subItem.getDi(), subData)));
+            offset += subItem.getDataLength();
+        }
+
+        return new PlcStruct(map);
     }
 
     /**

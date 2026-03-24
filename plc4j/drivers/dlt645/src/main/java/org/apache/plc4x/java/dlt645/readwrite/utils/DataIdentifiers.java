@@ -18,8 +18,10 @@
  */
 package org.apache.plc4x.java.dlt645.readwrite.utils;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -245,6 +247,165 @@ public final class DataIdentifiers {
      */
     public static Map<String, DataItemDescriptor> getAll() {
         return REGISTRY;
+    }
+
+    /**
+     * Check if a DI hex string contains a wildcard (0xFF) byte.
+     *
+     * @param diHex 8-char hex string (e.g. "0201FF00")
+     * @return true if any byte is 0xFF
+     */
+    public static boolean containsWildcard(String diHex) {
+        if (diHex == null || diHex.length() != 8) return false;
+        var upper = diHex.toUpperCase();
+        for (int i = 0; i < 4; i++) {
+            if ("FF".equals(upper.substring(i * 2, i * 2 + 2))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if a 4-byte DI array contains a wildcard (0xFF) byte.
+     */
+    public static boolean containsWildcard(byte[] di) {
+        if (di == null || di.length != 4) return false;
+        for (byte b : di) {
+            if ((b & 0xFF) == 0xFF) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get all concrete sub-items matching a wildcard DI, ordered by the wildcard byte's value.
+     * <p>
+     * For example, "0201FF00" matches 02010100, 02010200, 02010300 (A/B/C-phase voltage).
+     * The returned list is ordered by the varying byte value (ascending).
+     *
+     * @param wildcardDi 8-char hex string with one or more FF bytes (e.g. "0201FF00")
+     * @return ordered list of matching descriptors, empty if no match
+     */
+    public static List<DataItemDescriptor> getSubItems(String wildcardDi) {
+        if (wildcardDi == null || wildcardDi.length() != 8) return Collections.emptyList();
+        var upper = wildcardDi.toUpperCase();
+
+        // Find which byte positions are FF (wildcard)
+        var wildcardPositions = new boolean[4];
+        var fixedBytes = new byte[4];
+        for (int i = 0; i < 4; i++) {
+            var byteStr = upper.substring(i * 2, i * 2 + 2);
+            if ("FF".equals(byteStr)) {
+                wildcardPositions[i] = true;
+            } else {
+                fixedBytes[i] = (byte) Integer.parseInt(byteStr, 16);
+            }
+        }
+
+        // Find all registry entries matching the non-FF positions
+        var result = new ArrayList<DataItemDescriptor>();
+        for (var entry : REGISTRY.entrySet()) {
+            var di = entry.getKey();
+            boolean matches = true;
+            for (int i = 0; i < 4; i++) {
+                if (wildcardPositions[i]) continue;
+                var diByteStr = di.substring(i * 2, i * 2 + 2);
+                var diByte = (byte) Integer.parseInt(diByteStr, 16);
+                if (diByte != fixedBytes[i]) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches) {
+                result.add(entry.getValue());
+            }
+        }
+
+        // Sort by the first wildcard position's byte value (ascending)
+        for (int i = 0; i < 4; i++) {
+            if (wildcardPositions[i]) {
+                final int pos = i;
+                result.sort((a, b) -> {
+                    var aVal = Integer.parseInt(a.getDi().toUpperCase().substring(pos * 2, pos * 2 + 2), 16);
+                    var bVal = Integer.parseInt(b.getDi().toUpperCase().substring(pos * 2, pos * 2 + 2), 16);
+                    return Integer.compare(aVal, bVal);
+                });
+                break;
+            }
+        }
+
+        return Collections.unmodifiableList(result);
+    }
+
+    /**
+     * Compute the wildcard DI for a group of DIs that differ in exactly one byte position.
+     * <p>
+     * Given ["02010100", "02010200", "02010300"], returns "0201FF00" (position 2 varies).
+     * Returns null if the DIs don't form a valid wildcard group.
+     *
+     * @param diHexList list of 8-char hex DI strings
+     * @return wildcard DI hex string, or null if not groupable
+     */
+    public static String computeWildcardDi(List<String> diHexList) {
+        if (diHexList == null || diHexList.size() < 2) return null;
+
+        // Parse all DIs into byte arrays
+        var first = diHexList.get(0).toUpperCase();
+        var firstBytes = new byte[4];
+        for (int i = 0; i < 4; i++) {
+            firstBytes[i] = (byte) Integer.parseInt(first.substring(i * 2, i * 2 + 2), 16);
+        }
+
+        // Find positions that differ across all DIs
+        var differs = new boolean[4];
+        for (int d = 1; d < diHexList.size(); d++) {
+            var di = diHexList.get(d).toUpperCase();
+            for (int i = 0; i < 4; i++) {
+                var b = (byte) Integer.parseInt(di.substring(i * 2, i * 2 + 2), 16);
+                if (b != firstBytes[i]) {
+                    differs[i] = true;
+                }
+            }
+        }
+
+        // Exactly one position must differ
+        int differCount = 0;
+        int differPos = -1;
+        for (int i = 0; i < 4; i++) {
+            if (differs[i]) {
+                differCount++;
+                differPos = i;
+            }
+        }
+        if (differCount != 1) return null;
+
+        // Build wildcard DI
+        var sb = new StringBuilder();
+        for (int i = 0; i < 4; i++) {
+            if (i == differPos) {
+                sb.append("FF");
+            } else {
+                sb.append(String.format("%02X", firstBytes[i] & 0xFF));
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Find the index of a concrete DI within the sub-items of a wildcard DI.
+     *
+     * @param wildcardDi wildcard DI hex string (e.g. "0201FF00")
+     * @param concreteDi concrete DI hex string (e.g. "02010200")
+     * @return 0-based index, or -1 if not found
+     */
+    public static int getSubItemIndex(String wildcardDi, String concreteDi) {
+        var subItems = getSubItems(wildcardDi);
+        for (int i = 0; i < subItems.size(); i++) {
+            if (subItems.get(i).getDi().equalsIgnoreCase(concreteDi)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /**

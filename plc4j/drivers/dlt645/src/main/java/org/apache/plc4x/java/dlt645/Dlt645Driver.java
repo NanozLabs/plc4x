@@ -31,8 +31,8 @@ import org.apache.plc4x.java.spi.configuration.PlcConnectionConfiguration;
 import org.apache.plc4x.java.spi.connection.GeneratedDriverBase;
 import org.apache.plc4x.java.spi.connection.ProtocolStackConfigurer;
 import org.apache.plc4x.java.spi.connection.SingleProtocolStackConfigurer;
+import org.apache.plc4x.java.dlt645.optimizer.Dlt645BlockOptimizer;
 import org.apache.plc4x.java.spi.optimizer.BaseOptimizer;
-import org.apache.plc4x.java.spi.optimizer.SingleTagOptimizer;
 
 import java.util.Arrays;
 import java.util.List;
@@ -104,7 +104,7 @@ public class Dlt645Driver extends GeneratedDriverBase<Dlt645Frame> {
 
     @Override
     protected BaseOptimizer getOptimizer() {
-        return new SingleTagOptimizer();
+        return new Dlt645BlockOptimizer();
     }
 
     @Override
