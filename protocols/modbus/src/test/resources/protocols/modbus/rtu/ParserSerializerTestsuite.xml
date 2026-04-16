@@ -81,4 +81,31 @@
     </xml>
   </testcase>
 
+  <testcase>
+    <name>Write Single Register Exception Response</name>
+    <raw>0f8602a262</raw>
+    <root-type>ModbusADU</root-type>
+    <parser-arguments>
+      <driverType>MODBUS_RTU</driverType>
+      <response>true</response>
+    </parser-arguments>
+    <xml>
+      <ModbusADU>
+        <ModbusRtuADU>
+          <address dataType="uint" bitLength="8">15</address>
+          <pdu>
+            <ModbusPDU>
+              <errorFlag dataType="bit" bitLength="1">true</errorFlag>
+              <functionFlag dataType="uint" bitLength="7">6</functionFlag>
+              <ModbusPDUError>
+                <exceptionCode dataType="enum" bitLength="8">ILLEGAL_DATA_ADDRESS</exceptionCode>
+              </ModbusPDUError>
+            </ModbusPDU>
+          </pdu>
+          <crc dataType="uint" bitLength="16">41570</crc>
+        </ModbusRtuADU>
+      </ModbusADU>
+    </xml>
+  </testcase>
+
 </test:testsuite>

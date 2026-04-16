@@ -79,8 +79,14 @@ public class ModbusRtuProtocolLogic extends ModbusProtocolLogic<ModbusRtuADU> im
         RequestTransactionManager.RequestTransaction transaction = tm.startRequest();
         transaction.submit(() -> conversationContext.sendRequest(modbusRtuADU)
             .expectResponse(ModbusRtuADU.class, requestTimeout)
-            .onTimeout(future::completeExceptionally)
-            .onError((p, e) -> future.completeExceptionally(e))
+            .onTimeout(t -> {
+                future.completeExceptionally(t);
+                transaction.endRequest();
+            })
+            .onError((p, e) -> {
+                future.completeExceptionally(e);
+                transaction.endRequest();
+            })
             .unwrap(ModbusRtuADU::getPdu)
             .handle(responsePdu -> {
                 transaction.endRequest();

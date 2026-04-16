@@ -103,7 +103,7 @@ public abstract class ModbusPDU implements Message {
     // Switch Field (Depending on the discriminator values, passes the instantiation to a sub-type)
     ModbusPDUBuilder builder = null;
     if (EvaluationHelper.equals(errorFlag, (boolean) true)) {
-      builder = ModbusPDUError.staticParseModbusPDUBuilder(readBuffer, response);
+      builder = ModbusPDUError.staticParseModbusPDUBuilder(readBuffer, response, functionFlag);
     } else if (EvaluationHelper.equals(errorFlag, (boolean) false)
         && EvaluationHelper.equals(functionFlag, (byte) 0x02)
         && EvaluationHelper.equals(response, (boolean) false)) {

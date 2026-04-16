@@ -43,18 +43,22 @@ public class ModbusPDUError extends ModbusPDU implements Message {
   }
 
   public Byte getFunctionFlag() {
-    return 0;
+    return functionFlag;
   }
 
   public Boolean getResponse() {
-    return false;
+    return response;
   }
 
   // Properties.
+  protected final byte functionFlag;
+  protected final boolean response;
   protected final ModbusErrorCode exceptionCode;
 
-  public ModbusPDUError(ModbusErrorCode exceptionCode) {
+  public ModbusPDUError(byte functionFlag, boolean response, ModbusErrorCode exceptionCode) {
     super();
+    this.functionFlag = functionFlag;
+    this.response = response;
     this.exceptionCode = exceptionCode;
   }
 
@@ -97,7 +101,7 @@ public class ModbusPDUError extends ModbusPDU implements Message {
   }
 
   public static ModbusPDUBuilder staticParseModbusPDUBuilder(
-      ReadBuffer readBuffer, Boolean response) throws ParseException {
+      ReadBuffer readBuffer, Boolean response, byte functionFlag) throws ParseException {
     readBuffer.pullContext("ModbusPDUError");
     PositionAware positionAware = readBuffer;
     boolean _lastItem = ThreadLocalHelper.lastItemThreadLocal.get();
@@ -110,18 +114,22 @@ public class ModbusPDUError extends ModbusPDU implements Message {
 
     readBuffer.closeContext("ModbusPDUError");
     // Create the instance
-    return new ModbusPDUErrorBuilderImpl(exceptionCode);
+    return new ModbusPDUErrorBuilderImpl(functionFlag, response, exceptionCode);
   }
 
   public static class ModbusPDUErrorBuilderImpl implements ModbusPDU.ModbusPDUBuilder {
+    private final byte functionFlag;
+    private final boolean response;
     private final ModbusErrorCode exceptionCode;
 
-    public ModbusPDUErrorBuilderImpl(ModbusErrorCode exceptionCode) {
+    public ModbusPDUErrorBuilderImpl(byte functionFlag, boolean response, ModbusErrorCode exceptionCode) {
+      this.functionFlag = functionFlag;
+      this.response = response;
       this.exceptionCode = exceptionCode;
     }
 
     public ModbusPDUError build() {
-      ModbusPDUError modbusPDUError = new ModbusPDUError(exceptionCode);
+      ModbusPDUError modbusPDUError = new ModbusPDUError(functionFlag, response, exceptionCode);
       return modbusPDUError;
     }
   }
@@ -135,12 +143,16 @@ public class ModbusPDUError extends ModbusPDU implements Message {
       return false;
     }
     ModbusPDUError that = (ModbusPDUError) o;
-    return (getExceptionCode() == that.getExceptionCode()) && super.equals(that) && true;
+    return (getFunctionFlag() == that.getFunctionFlag())
+        && (getResponse() == that.getResponse())
+        && (getExceptionCode() == that.getExceptionCode())
+        && super.equals(that)
+        && true;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), getExceptionCode());
+    return Objects.hash(super.hashCode(), getFunctionFlag(), getResponse(), getExceptionCode());
   }
 
   @Override
