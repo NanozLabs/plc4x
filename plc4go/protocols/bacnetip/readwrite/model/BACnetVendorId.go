@@ -113,7 +113,7 @@ const (
 	BACnetVendorId_REGULATOR_AUSTRALIAPTY_LTD                                                   BACnetVendorId = 67
 	BACnetVendorId_TOUCH_PLATE_LIGHTING_CONTROLS                                                BACnetVendorId = 68
 	BACnetVendorId_AMANN_GMBH                                                                   BACnetVendorId = 69
-	BACnetVendorId_RLE_TECHNOLOGIES                                                             BACnetVendorId = 70
+	BACnetVendorId_PARAMETERLLC                                                                 BACnetVendorId = 70
 	BACnetVendorId_CARDKEY_SYSTEMS                                                              BACnetVendorId = 71
 	BACnetVendorId_SECOM_CO_LTD                                                                 BACnetVendorId = 72
 	BACnetVendorId_ABB_GEBUDETECHNIKAG_BEREICH_NET_SERV                                         BACnetVendorId = 73
@@ -372,7 +372,7 @@ const (
 	BACnetVendorId_CEMTREX_INC                                                                  BACnetVendorId = 326
 	BACnetVendorId_PERFORMANCE_TECHNOLOGIES_INC                                                 BACnetVendorId = 327
 	BACnetVendorId_XTRALIS_AUST_PTY_LTD                                                         BACnetVendorId = 328
-	BACnetVendorId_TROX_GMBH                                                                    BACnetVendorId = 329
+	BACnetVendorId_TROXSE                                                                       BACnetVendorId = 329
 	BACnetVendorId_BEIJING_HYSINE_TECHNOLOGY_CO_LTD                                             BACnetVendorId = 330
 	BACnetVendorId_RCK_CONTROLS_INC                                                             BACnetVendorId = 331
 	BACnetVendorId_DISTECH_CONTROLSSAS                                                          BACnetVendorId = 332
@@ -1615,6 +1615,36 @@ const (
 	BACnetVendorId_SYSTEM_MART_LTD                                                              BACnetVendorId = 1579
 	BACnetVendorId_SPOT_GMBH                                                                    BACnetVendorId = 1580
 	BACnetVendorId_INTEMPCO_CONTROLS_LTD                                                        BACnetVendorId = 1581
+	BACnetVendorId_ROSEMONT_ENGINEERING_INC                                                     BACnetVendorId = 1582
+	BACnetVendorId_MINIVEIL_INDUSTRIES_LTD                                                      BACnetVendorId = 1583
+	BACnetVendorId_PROFCONAB                                                                    BACnetVendorId = 1584
+	BACnetVendorId_KE_AUTOMASJONAS                                                              BACnetVendorId = 1585
+	BACnetVendorId_NORDOMATIC_PROPERTY_TECHNOLOGIESAB                                           BACnetVendorId = 1586
+	BACnetVendorId_RUNWISE                                                                      BACnetVendorId = 1587
+	BACnetVendorId_KARELAVOJSKY                                                                 BACnetVendorId = 1588
+	BACnetVendorId_ABBLV_INSTALLATION_MATERIALS_CO_LTD_BEIJING                                  BACnetVendorId = 1589
+	BACnetVendorId_ENER_SEARCH_SOLAR_GMBH                                                       BACnetVendorId = 1590
+	BACnetVendorId_ZURN_ELKAY_WATER_SOLUTIONS                                                   BACnetVendorId = 1591
+	BACnetVendorId_ANDIVI                                                                       BACnetVendorId = 1592
+	BACnetVendorId_CHYI_LEE_INDUSTRY_CO_LTD                                                     BACnetVendorId = 1593
+	BACnetVendorId_ALLBEEBV                                                                     BACnetVendorId = 1594
+	BACnetVendorId_KAMPMANN_GMBH_COKG                                                           BACnetVendorId = 1595
+	BACnetVendorId_COSEL_ELEKTRONIK_OTOMASYON_SISTEMLERI_SAN_TIC_LTD_STI                        BACnetVendorId = 1596
+	BACnetVendorId_RACTL_DESIGNS                                                                BACnetVendorId = 1597
+	BACnetVendorId_DATABRIDGE_DYNAMIC_PVT_LTD                                                   BACnetVendorId = 1598
+	BACnetVendorId_EVOLO_TECHNOLOGIESAS                                                         BACnetVendorId = 1599
+	BACnetVendorId_ENERGY_PLUS_TEKNOLOJI_IMALAT_ITHALATVE_IHRACAT_SANAYIAS                      BACnetVendorId = 1600
+	BACnetVendorId_GAIAMESH_INC                                                                 BACnetVendorId = 1601
+	BACnetVendorId_LOVATO_ELECTRICSPA                                                           BACnetVendorId = 1602
+	BACnetVendorId_QPAC_SYSTEMS_INC                                                             BACnetVendorId = 1603
+	BACnetVendorId_YOBIIQ_INTELLIGENCEBV                                                        BACnetVendorId = 1604
+	BACnetVendorId_CAMFILUSA_INC                                                                BACnetVendorId = 1605
+	BACnetVendorId_RADNOX                                                                       BACnetVendorId = 1606
+	BACnetVendorId_OPTOSPARK_SDN_BHD                                                            BACnetVendorId = 1607
+	BACnetVendorId_CONTROLBRIGHT                                                                BACnetVendorId = 1608
+	BACnetVendorId_PENTAIR_RESIDENTIAL_FILTRATION                                               BACnetVendorId = 1609
+	BACnetVendorId_VENAERA_INC                                                                  BACnetVendorId = 1610
+	BACnetVendorId_HUMI_PURE                                                                    BACnetVendorId = 1611
 	BACnetVendorId_UNKNOWN_VENDOR                                                               BACnetVendorId = 0xFFFF
 )
 
@@ -1693,7 +1723,7 @@ func init() {
 		BACnetVendorId_REGULATOR_AUSTRALIAPTY_LTD,
 		BACnetVendorId_TOUCH_PLATE_LIGHTING_CONTROLS,
 		BACnetVendorId_AMANN_GMBH,
-		BACnetVendorId_RLE_TECHNOLOGIES,
+		BACnetVendorId_PARAMETERLLC,
 		BACnetVendorId_CARDKEY_SYSTEMS,
 		BACnetVendorId_SECOM_CO_LTD,
 		BACnetVendorId_ABB_GEBUDETECHNIKAG_BEREICH_NET_SERV,
@@ -1952,7 +1982,7 @@ func init() {
 		BACnetVendorId_CEMTREX_INC,
 		BACnetVendorId_PERFORMANCE_TECHNOLOGIES_INC,
 		BACnetVendorId_XTRALIS_AUST_PTY_LTD,
-		BACnetVendorId_TROX_GMBH,
+		BACnetVendorId_TROXSE,
 		BACnetVendorId_BEIJING_HYSINE_TECHNOLOGY_CO_LTD,
 		BACnetVendorId_RCK_CONTROLS_INC,
 		BACnetVendorId_DISTECH_CONTROLSSAS,
@@ -3195,6 +3225,36 @@ func init() {
 		BACnetVendorId_SYSTEM_MART_LTD,
 		BACnetVendorId_SPOT_GMBH,
 		BACnetVendorId_INTEMPCO_CONTROLS_LTD,
+		BACnetVendorId_ROSEMONT_ENGINEERING_INC,
+		BACnetVendorId_MINIVEIL_INDUSTRIES_LTD,
+		BACnetVendorId_PROFCONAB,
+		BACnetVendorId_KE_AUTOMASJONAS,
+		BACnetVendorId_NORDOMATIC_PROPERTY_TECHNOLOGIESAB,
+		BACnetVendorId_RUNWISE,
+		BACnetVendorId_KARELAVOJSKY,
+		BACnetVendorId_ABBLV_INSTALLATION_MATERIALS_CO_LTD_BEIJING,
+		BACnetVendorId_ENER_SEARCH_SOLAR_GMBH,
+		BACnetVendorId_ZURN_ELKAY_WATER_SOLUTIONS,
+		BACnetVendorId_ANDIVI,
+		BACnetVendorId_CHYI_LEE_INDUSTRY_CO_LTD,
+		BACnetVendorId_ALLBEEBV,
+		BACnetVendorId_KAMPMANN_GMBH_COKG,
+		BACnetVendorId_COSEL_ELEKTRONIK_OTOMASYON_SISTEMLERI_SAN_TIC_LTD_STI,
+		BACnetVendorId_RACTL_DESIGNS,
+		BACnetVendorId_DATABRIDGE_DYNAMIC_PVT_LTD,
+		BACnetVendorId_EVOLO_TECHNOLOGIESAS,
+		BACnetVendorId_ENERGY_PLUS_TEKNOLOJI_IMALAT_ITHALATVE_IHRACAT_SANAYIAS,
+		BACnetVendorId_GAIAMESH_INC,
+		BACnetVendorId_LOVATO_ELECTRICSPA,
+		BACnetVendorId_QPAC_SYSTEMS_INC,
+		BACnetVendorId_YOBIIQ_INTELLIGENCEBV,
+		BACnetVendorId_CAMFILUSA_INC,
+		BACnetVendorId_RADNOX,
+		BACnetVendorId_OPTOSPARK_SDN_BHD,
+		BACnetVendorId_CONTROLBRIGHT,
+		BACnetVendorId_PENTAIR_RESIDENTIAL_FILTRATION,
+		BACnetVendorId_VENAERA_INC,
+		BACnetVendorId_HUMI_PURE,
 		BACnetVendorId_UNKNOWN_VENDOR,
 	}
 }
@@ -5785,9 +5845,81 @@ func (e BACnetVendorId) VendorId() uint16 {
 		{ /* '1581' */
 			return 1581
 		}
+	case 1582:
+		{ /* '1582' */
+			return 1582
+		}
+	case 1583:
+		{ /* '1583' */
+			return 1583
+		}
+	case 1584:
+		{ /* '1584' */
+			return 1584
+		}
+	case 1585:
+		{ /* '1585' */
+			return 1585
+		}
+	case 1586:
+		{ /* '1586' */
+			return 1586
+		}
+	case 1587:
+		{ /* '1587' */
+			return 1587
+		}
+	case 1588:
+		{ /* '1588' */
+			return 1588
+		}
+	case 1589:
+		{ /* '1589' */
+			return 1589
+		}
 	case 159:
 		{ /* '159' */
 			return 159
+		}
+	case 1590:
+		{ /* '1590' */
+			return 1590
+		}
+	case 1591:
+		{ /* '1591' */
+			return 1591
+		}
+	case 1592:
+		{ /* '1592' */
+			return 1592
+		}
+	case 1593:
+		{ /* '1593' */
+			return 1593
+		}
+	case 1594:
+		{ /* '1594' */
+			return 1594
+		}
+	case 1595:
+		{ /* '1595' */
+			return 1595
+		}
+	case 1596:
+		{ /* '1596' */
+			return 1596
+		}
+	case 1597:
+		{ /* '1597' */
+			return 1597
+		}
+	case 1598:
+		{ /* '1598' */
+			return 1598
+		}
+	case 1599:
+		{ /* '1599' */
+			return 1599
 		}
 	case 16:
 		{ /* '16' */
@@ -5797,9 +5929,57 @@ func (e BACnetVendorId) VendorId() uint16 {
 		{ /* '160' */
 			return 160
 		}
+	case 1600:
+		{ /* '1600' */
+			return 1600
+		}
+	case 1601:
+		{ /* '1601' */
+			return 1601
+		}
+	case 1602:
+		{ /* '1602' */
+			return 1602
+		}
+	case 1603:
+		{ /* '1603' */
+			return 1603
+		}
+	case 1604:
+		{ /* '1604' */
+			return 1604
+		}
+	case 1605:
+		{ /* '1605' */
+			return 1605
+		}
+	case 1606:
+		{ /* '1606' */
+			return 1606
+		}
+	case 1607:
+		{ /* '1607' */
+			return 1607
+		}
+	case 1608:
+		{ /* '1608' */
+			return 1608
+		}
+	case 1609:
+		{ /* '1609' */
+			return 1609
+		}
 	case 161:
 		{ /* '161' */
 			return 161
+		}
+	case 1610:
+		{ /* '1610' */
+			return 1610
+		}
+	case 1611:
+		{ /* '1611' */
+			return 1611
 		}
 	case 162:
 		{ /* '162' */
@@ -12095,9 +12275,81 @@ func (e BACnetVendorId) VendorName() string {
 		{ /* '1581' */
 			return "Intempco Controls Ltd."
 		}
+	case 1582:
+		{ /* '1582' */
+			return "Rosemont Engineering, Inc."
+		}
+	case 1583:
+		{ /* '1583' */
+			return "Miniveil Industries Ltd."
+		}
+	case 1584:
+		{ /* '1584' */
+			return "Profcon AB"
+		}
+	case 1585:
+		{ /* '1585' */
+			return "KE Automasjon AS"
+		}
+	case 1586:
+		{ /* '1586' */
+			return "Nordomatic Property Technologies AB"
+		}
+	case 1587:
+		{ /* '1587' */
+			return "Runwise"
+		}
+	case 1588:
+		{ /* '1588' */
+			return "Karel Čavojsky"
+		}
+	case 1589:
+		{ /* '1589' */
+			return "ABB LV Installation Materials Co., Ltd. Beijing"
+		}
 	case 159:
 		{ /* '159' */
 			return "SE-Elektronic GmbH"
+		}
+	case 1590:
+		{ /* '1590' */
+			return "EnerSearch Solar GmbH"
+		}
+	case 1591:
+		{ /* '1591' */
+			return "Zurn Elkay Water Solutions"
+		}
+	case 1592:
+		{ /* '1592' */
+			return "Andivi"
+		}
+	case 1593:
+		{ /* '1593' */
+			return "Chyi Lee Industry Co., Ltd."
+		}
+	case 1594:
+		{ /* '1594' */
+			return "Allbee B.V."
+		}
+	case 1595:
+		{ /* '1595' */
+			return "Kampmann GmbH & Co. KG"
+		}
+	case 1596:
+		{ /* '1596' */
+			return "Cosel Elektronik Otomasyon Sistemleri San. Tic. Ltd. Sti."
+		}
+	case 1597:
+		{ /* '1597' */
+			return "Ractl Designs"
+		}
+	case 1598:
+		{ /* '1598' */
+			return "Databridge Dynamic Pvt Ltd"
+		}
+	case 1599:
+		{ /* '1599' */
+			return "Evolo Technologies AS"
 		}
 	case 16:
 		{ /* '16' */
@@ -12107,9 +12359,57 @@ func (e BACnetVendorId) VendorName() string {
 		{ /* '160' */
 			return "Rockwell Automation"
 		}
+	case 1600:
+		{ /* '1600' */
+			return "EnergyPlus Teknoloji Imalat Ithalat ve Ihracat Sanayi AS"
+		}
+	case 1601:
+		{ /* '1601' */
+			return "Gaiamesh Inc."
+		}
+	case 1602:
+		{ /* '1602' */
+			return "Lovato Electric S.P.A."
+		}
+	case 1603:
+		{ /* '1603' */
+			return "Q-PAC Systems, Inc."
+		}
+	case 1604:
+		{ /* '1604' */
+			return "Yobiiq Intelligence B.V."
+		}
+	case 1605:
+		{ /* '1605' */
+			return "Camfil USA Inc."
+		}
+	case 1606:
+		{ /* '1606' */
+			return "Radnox"
+		}
+	case 1607:
+		{ /* '1607' */
+			return "Optospark Sdn. Bhd."
+		}
+	case 1608:
+		{ /* '1608' */
+			return "Controlbright"
+		}
+	case 1609:
+		{ /* '1609' */
+			return "Pentair Residential Filtration"
+		}
 	case 161:
 		{ /* '161' */
 			return "Enflex Corp."
+		}
+	case 1610:
+		{ /* '1610' */
+			return "Venaera Inc."
+		}
+	case 1611:
+		{ /* '1611' */
+			return "HumiPure"
 		}
 	case 162:
 		{ /* '162' */
@@ -12853,7 +13153,7 @@ func (e BACnetVendorId) VendorName() string {
 		}
 	case 329:
 		{ /* '329' */
-			return "TROX GmbH"
+			return "TROX SE"
 		}
 	case 33:
 		{ /* '33' */
@@ -14493,7 +14793,7 @@ func (e BACnetVendorId) VendorName() string {
 		}
 	case 70:
 		{ /* '70' */
-			return "RLE Technologies"
+			return "Parameter LLC"
 		}
 	case 700:
 		{ /* '700' */
@@ -17112,14 +17412,74 @@ func BACnetVendorIdByValue(value uint16) (enum BACnetVendorId, ok bool) {
 		return BACnetVendorId_SPOT_GMBH, true
 	case 1581:
 		return BACnetVendorId_INTEMPCO_CONTROLS_LTD, true
+	case 1582:
+		return BACnetVendorId_ROSEMONT_ENGINEERING_INC, true
+	case 1583:
+		return BACnetVendorId_MINIVEIL_INDUSTRIES_LTD, true
+	case 1584:
+		return BACnetVendorId_PROFCONAB, true
+	case 1585:
+		return BACnetVendorId_KE_AUTOMASJONAS, true
+	case 1586:
+		return BACnetVendorId_NORDOMATIC_PROPERTY_TECHNOLOGIESAB, true
+	case 1587:
+		return BACnetVendorId_RUNWISE, true
+	case 1588:
+		return BACnetVendorId_KARELAVOJSKY, true
+	case 1589:
+		return BACnetVendorId_ABBLV_INSTALLATION_MATERIALS_CO_LTD_BEIJING, true
 	case 159:
 		return BACnetVendorId_SE_ELEKTRONIC_GMBH, true
+	case 1590:
+		return BACnetVendorId_ENER_SEARCH_SOLAR_GMBH, true
+	case 1591:
+		return BACnetVendorId_ZURN_ELKAY_WATER_SOLUTIONS, true
+	case 1592:
+		return BACnetVendorId_ANDIVI, true
+	case 1593:
+		return BACnetVendorId_CHYI_LEE_INDUSTRY_CO_LTD, true
+	case 1594:
+		return BACnetVendorId_ALLBEEBV, true
+	case 1595:
+		return BACnetVendorId_KAMPMANN_GMBH_COKG, true
+	case 1596:
+		return BACnetVendorId_COSEL_ELEKTRONIK_OTOMASYON_SISTEMLERI_SAN_TIC_LTD_STI, true
+	case 1597:
+		return BACnetVendorId_RACTL_DESIGNS, true
+	case 1598:
+		return BACnetVendorId_DATABRIDGE_DYNAMIC_PVT_LTD, true
+	case 1599:
+		return BACnetVendorId_EVOLO_TECHNOLOGIESAS, true
 	case 16:
 		return BACnetVendorId_UNITED_TECHNOLOGIES_CARRIER, true
 	case 160:
 		return BACnetVendorId_ROCKWELL_AUTOMATION, true
+	case 1600:
+		return BACnetVendorId_ENERGY_PLUS_TEKNOLOJI_IMALAT_ITHALATVE_IHRACAT_SANAYIAS, true
+	case 1601:
+		return BACnetVendorId_GAIAMESH_INC, true
+	case 1602:
+		return BACnetVendorId_LOVATO_ELECTRICSPA, true
+	case 1603:
+		return BACnetVendorId_QPAC_SYSTEMS_INC, true
+	case 1604:
+		return BACnetVendorId_YOBIIQ_INTELLIGENCEBV, true
+	case 1605:
+		return BACnetVendorId_CAMFILUSA_INC, true
+	case 1606:
+		return BACnetVendorId_RADNOX, true
+	case 1607:
+		return BACnetVendorId_OPTOSPARK_SDN_BHD, true
+	case 1608:
+		return BACnetVendorId_CONTROLBRIGHT, true
+	case 1609:
+		return BACnetVendorId_PENTAIR_RESIDENTIAL_FILTRATION, true
 	case 161:
 		return BACnetVendorId_ENFLEX_CORP, true
+	case 1610:
+		return BACnetVendorId_VENAERA_INC, true
+	case 1611:
+		return BACnetVendorId_HUMI_PURE, true
 	case 162:
 		return BACnetVendorId_ASI_CONTROLS, true
 	case 163:
@@ -17491,7 +17851,7 @@ func BACnetVendorIdByValue(value uint16) (enum BACnetVendorId, ok bool) {
 	case 328:
 		return BACnetVendorId_XTRALIS_AUST_PTY_LTD, true
 	case 329:
-		return BACnetVendorId_TROX_GMBH, true
+		return BACnetVendorId_TROXSE, true
 	case 33:
 		return BACnetVendorId_NORTH_BUILDING_TECHNOLOGIES_LIMITED, true
 	case 330:
@@ -18311,7 +18671,7 @@ func BACnetVendorIdByValue(value uint16) (enum BACnetVendorId, ok bool) {
 	case 7:
 		return BACnetVendorId_SIEMENS_SCHWEIZAG, true
 	case 70:
-		return BACnetVendorId_RLE_TECHNOLOGIES, true
+		return BACnetVendorId_PARAMETERLLC, true
 	case 700:
 		return BACnetVendorId_FUJI_ELECTRIC_CO_LTD, true
 	case 701:
@@ -20264,14 +20624,74 @@ func BACnetVendorIdByName(value string) (enum BACnetVendorId, ok bool) {
 		return BACnetVendorId_SPOT_GMBH, true
 	case "INTEMPCO_CONTROLS_LTD":
 		return BACnetVendorId_INTEMPCO_CONTROLS_LTD, true
+	case "ROSEMONT_ENGINEERING_INC":
+		return BACnetVendorId_ROSEMONT_ENGINEERING_INC, true
+	case "MINIVEIL_INDUSTRIES_LTD":
+		return BACnetVendorId_MINIVEIL_INDUSTRIES_LTD, true
+	case "PROFCONAB":
+		return BACnetVendorId_PROFCONAB, true
+	case "KE_AUTOMASJONAS":
+		return BACnetVendorId_KE_AUTOMASJONAS, true
+	case "NORDOMATIC_PROPERTY_TECHNOLOGIESAB":
+		return BACnetVendorId_NORDOMATIC_PROPERTY_TECHNOLOGIESAB, true
+	case "RUNWISE":
+		return BACnetVendorId_RUNWISE, true
+	case "KARELAVOJSKY":
+		return BACnetVendorId_KARELAVOJSKY, true
+	case "ABBLV_INSTALLATION_MATERIALS_CO_LTD_BEIJING":
+		return BACnetVendorId_ABBLV_INSTALLATION_MATERIALS_CO_LTD_BEIJING, true
 	case "SE_ELEKTRONIC_GMBH":
 		return BACnetVendorId_SE_ELEKTRONIC_GMBH, true
+	case "ENER_SEARCH_SOLAR_GMBH":
+		return BACnetVendorId_ENER_SEARCH_SOLAR_GMBH, true
+	case "ZURN_ELKAY_WATER_SOLUTIONS":
+		return BACnetVendorId_ZURN_ELKAY_WATER_SOLUTIONS, true
+	case "ANDIVI":
+		return BACnetVendorId_ANDIVI, true
+	case "CHYI_LEE_INDUSTRY_CO_LTD":
+		return BACnetVendorId_CHYI_LEE_INDUSTRY_CO_LTD, true
+	case "ALLBEEBV":
+		return BACnetVendorId_ALLBEEBV, true
+	case "KAMPMANN_GMBH_COKG":
+		return BACnetVendorId_KAMPMANN_GMBH_COKG, true
+	case "COSEL_ELEKTRONIK_OTOMASYON_SISTEMLERI_SAN_TIC_LTD_STI":
+		return BACnetVendorId_COSEL_ELEKTRONIK_OTOMASYON_SISTEMLERI_SAN_TIC_LTD_STI, true
+	case "RACTL_DESIGNS":
+		return BACnetVendorId_RACTL_DESIGNS, true
+	case "DATABRIDGE_DYNAMIC_PVT_LTD":
+		return BACnetVendorId_DATABRIDGE_DYNAMIC_PVT_LTD, true
+	case "EVOLO_TECHNOLOGIESAS":
+		return BACnetVendorId_EVOLO_TECHNOLOGIESAS, true
 	case "UNITED_TECHNOLOGIES_CARRIER":
 		return BACnetVendorId_UNITED_TECHNOLOGIES_CARRIER, true
 	case "ROCKWELL_AUTOMATION":
 		return BACnetVendorId_ROCKWELL_AUTOMATION, true
+	case "ENERGY_PLUS_TEKNOLOJI_IMALAT_ITHALATVE_IHRACAT_SANAYIAS":
+		return BACnetVendorId_ENERGY_PLUS_TEKNOLOJI_IMALAT_ITHALATVE_IHRACAT_SANAYIAS, true
+	case "GAIAMESH_INC":
+		return BACnetVendorId_GAIAMESH_INC, true
+	case "LOVATO_ELECTRICSPA":
+		return BACnetVendorId_LOVATO_ELECTRICSPA, true
+	case "QPAC_SYSTEMS_INC":
+		return BACnetVendorId_QPAC_SYSTEMS_INC, true
+	case "YOBIIQ_INTELLIGENCEBV":
+		return BACnetVendorId_YOBIIQ_INTELLIGENCEBV, true
+	case "CAMFILUSA_INC":
+		return BACnetVendorId_CAMFILUSA_INC, true
+	case "RADNOX":
+		return BACnetVendorId_RADNOX, true
+	case "OPTOSPARK_SDN_BHD":
+		return BACnetVendorId_OPTOSPARK_SDN_BHD, true
+	case "CONTROLBRIGHT":
+		return BACnetVendorId_CONTROLBRIGHT, true
+	case "PENTAIR_RESIDENTIAL_FILTRATION":
+		return BACnetVendorId_PENTAIR_RESIDENTIAL_FILTRATION, true
 	case "ENFLEX_CORP":
 		return BACnetVendorId_ENFLEX_CORP, true
+	case "VENAERA_INC":
+		return BACnetVendorId_VENAERA_INC, true
+	case "HUMI_PURE":
+		return BACnetVendorId_HUMI_PURE, true
 	case "ASI_CONTROLS":
 		return BACnetVendorId_ASI_CONTROLS, true
 	case "SYS_MIK_GMBH_DRESDEN":
@@ -20642,8 +21062,8 @@ func BACnetVendorIdByName(value string) (enum BACnetVendorId, ok bool) {
 		return BACnetVendorId_PERFORMANCE_TECHNOLOGIES_INC, true
 	case "XTRALIS_AUST_PTY_LTD":
 		return BACnetVendorId_XTRALIS_AUST_PTY_LTD, true
-	case "TROX_GMBH":
-		return BACnetVendorId_TROX_GMBH, true
+	case "TROXSE":
+		return BACnetVendorId_TROXSE, true
 	case "NORTH_BUILDING_TECHNOLOGIES_LIMITED":
 		return BACnetVendorId_NORTH_BUILDING_TECHNOLOGIES_LIMITED, true
 	case "BEIJING_HYSINE_TECHNOLOGY_CO_LTD":
@@ -21462,8 +21882,8 @@ func BACnetVendorIdByName(value string) (enum BACnetVendorId, ok bool) {
 		return BACnetVendorId_IPID_SPZOO_LIMITED, true
 	case "SIEMENS_SCHWEIZAG":
 		return BACnetVendorId_SIEMENS_SCHWEIZAG, true
-	case "RLE_TECHNOLOGIES":
-		return BACnetVendorId_RLE_TECHNOLOGIES, true
+	case "PARAMETERLLC":
+		return BACnetVendorId_PARAMETERLLC, true
 	case "FUJI_ELECTRIC_CO_LTD":
 		return BACnetVendorId_FUJI_ELECTRIC_CO_LTD, true
 	case "VIEW_INC":
@@ -23488,14 +23908,74 @@ func (e BACnetVendorId) PLC4XEnumName() string {
 		return "SPOT_GMBH"
 	case BACnetVendorId_INTEMPCO_CONTROLS_LTD:
 		return "INTEMPCO_CONTROLS_LTD"
+	case BACnetVendorId_ROSEMONT_ENGINEERING_INC:
+		return "ROSEMONT_ENGINEERING_INC"
+	case BACnetVendorId_MINIVEIL_INDUSTRIES_LTD:
+		return "MINIVEIL_INDUSTRIES_LTD"
+	case BACnetVendorId_PROFCONAB:
+		return "PROFCONAB"
+	case BACnetVendorId_KE_AUTOMASJONAS:
+		return "KE_AUTOMASJONAS"
+	case BACnetVendorId_NORDOMATIC_PROPERTY_TECHNOLOGIESAB:
+		return "NORDOMATIC_PROPERTY_TECHNOLOGIESAB"
+	case BACnetVendorId_RUNWISE:
+		return "RUNWISE"
+	case BACnetVendorId_KARELAVOJSKY:
+		return "KARELAVOJSKY"
+	case BACnetVendorId_ABBLV_INSTALLATION_MATERIALS_CO_LTD_BEIJING:
+		return "ABBLV_INSTALLATION_MATERIALS_CO_LTD_BEIJING"
 	case BACnetVendorId_SE_ELEKTRONIC_GMBH:
 		return "SE_ELEKTRONIC_GMBH"
+	case BACnetVendorId_ENER_SEARCH_SOLAR_GMBH:
+		return "ENER_SEARCH_SOLAR_GMBH"
+	case BACnetVendorId_ZURN_ELKAY_WATER_SOLUTIONS:
+		return "ZURN_ELKAY_WATER_SOLUTIONS"
+	case BACnetVendorId_ANDIVI:
+		return "ANDIVI"
+	case BACnetVendorId_CHYI_LEE_INDUSTRY_CO_LTD:
+		return "CHYI_LEE_INDUSTRY_CO_LTD"
+	case BACnetVendorId_ALLBEEBV:
+		return "ALLBEEBV"
+	case BACnetVendorId_KAMPMANN_GMBH_COKG:
+		return "KAMPMANN_GMBH_COKG"
+	case BACnetVendorId_COSEL_ELEKTRONIK_OTOMASYON_SISTEMLERI_SAN_TIC_LTD_STI:
+		return "COSEL_ELEKTRONIK_OTOMASYON_SISTEMLERI_SAN_TIC_LTD_STI"
+	case BACnetVendorId_RACTL_DESIGNS:
+		return "RACTL_DESIGNS"
+	case BACnetVendorId_DATABRIDGE_DYNAMIC_PVT_LTD:
+		return "DATABRIDGE_DYNAMIC_PVT_LTD"
+	case BACnetVendorId_EVOLO_TECHNOLOGIESAS:
+		return "EVOLO_TECHNOLOGIESAS"
 	case BACnetVendorId_UNITED_TECHNOLOGIES_CARRIER:
 		return "UNITED_TECHNOLOGIES_CARRIER"
 	case BACnetVendorId_ROCKWELL_AUTOMATION:
 		return "ROCKWELL_AUTOMATION"
+	case BACnetVendorId_ENERGY_PLUS_TEKNOLOJI_IMALAT_ITHALATVE_IHRACAT_SANAYIAS:
+		return "ENERGY_PLUS_TEKNOLOJI_IMALAT_ITHALATVE_IHRACAT_SANAYIAS"
+	case BACnetVendorId_GAIAMESH_INC:
+		return "GAIAMESH_INC"
+	case BACnetVendorId_LOVATO_ELECTRICSPA:
+		return "LOVATO_ELECTRICSPA"
+	case BACnetVendorId_QPAC_SYSTEMS_INC:
+		return "QPAC_SYSTEMS_INC"
+	case BACnetVendorId_YOBIIQ_INTELLIGENCEBV:
+		return "YOBIIQ_INTELLIGENCEBV"
+	case BACnetVendorId_CAMFILUSA_INC:
+		return "CAMFILUSA_INC"
+	case BACnetVendorId_RADNOX:
+		return "RADNOX"
+	case BACnetVendorId_OPTOSPARK_SDN_BHD:
+		return "OPTOSPARK_SDN_BHD"
+	case BACnetVendorId_CONTROLBRIGHT:
+		return "CONTROLBRIGHT"
+	case BACnetVendorId_PENTAIR_RESIDENTIAL_FILTRATION:
+		return "PENTAIR_RESIDENTIAL_FILTRATION"
 	case BACnetVendorId_ENFLEX_CORP:
 		return "ENFLEX_CORP"
+	case BACnetVendorId_VENAERA_INC:
+		return "VENAERA_INC"
+	case BACnetVendorId_HUMI_PURE:
+		return "HUMI_PURE"
 	case BACnetVendorId_ASI_CONTROLS:
 		return "ASI_CONTROLS"
 	case BACnetVendorId_SYS_MIK_GMBH_DRESDEN:
@@ -23866,8 +24346,8 @@ func (e BACnetVendorId) PLC4XEnumName() string {
 		return "PERFORMANCE_TECHNOLOGIES_INC"
 	case BACnetVendorId_XTRALIS_AUST_PTY_LTD:
 		return "XTRALIS_AUST_PTY_LTD"
-	case BACnetVendorId_TROX_GMBH:
-		return "TROX_GMBH"
+	case BACnetVendorId_TROXSE:
+		return "TROXSE"
 	case BACnetVendorId_NORTH_BUILDING_TECHNOLOGIES_LIMITED:
 		return "NORTH_BUILDING_TECHNOLOGIES_LIMITED"
 	case BACnetVendorId_BEIJING_HYSINE_TECHNOLOGY_CO_LTD:
@@ -24686,8 +25166,8 @@ func (e BACnetVendorId) PLC4XEnumName() string {
 		return "IPID_SPZOO_LIMITED"
 	case BACnetVendorId_SIEMENS_SCHWEIZAG:
 		return "SIEMENS_SCHWEIZAG"
-	case BACnetVendorId_RLE_TECHNOLOGIES:
-		return "RLE_TECHNOLOGIES"
+	case BACnetVendorId_PARAMETERLLC:
+		return "PARAMETERLLC"
 	case BACnetVendorId_FUJI_ELECTRIC_CO_LTD:
 		return "FUJI_ELECTRIC_CO_LTD"
 	case BACnetVendorId_VIEW_INC:
