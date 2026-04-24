@@ -40,6 +40,7 @@ import org.apache.plc4x.java.spi.transaction.RequestTransactionManager;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ModbusTcpProtocolLogic extends ModbusProtocolLogic<ModbusTcpADU> implements HasConfiguration<ModbusTcpConfiguration> {
 
@@ -83,15 +84,22 @@ public class ModbusTcpProtocolLogic extends ModbusProtocolLogic<ModbusTcpADU> im
         ModbusTcpADU modbusTcpADU = new ModbusTcpADU(transactionIdentifier, unitId, readRequestPdu);
 
         RequestTransactionManager.RequestTransaction transaction = tm.startRequest();
+        AtomicBoolean transactionFinished = new AtomicBoolean(false);
         transaction.submit(() -> conversationContext.sendRequest(modbusTcpADU)
             .expectResponse(ModbusTcpADU.class, requestTimeout)
-            .onTimeout(future::completeExceptionally)
-            .onError((p, e) -> future.completeExceptionally(e))
+            .onTimeout(e -> {
+                future.completeExceptionally(e);
+                completeTransaction(transaction, transactionFinished);
+            })
+            .onError((p, e) -> {
+                future.completeExceptionally(e);
+                completeTransaction(transaction, transactionFinished);
+            })
             .check(p -> ((p.getTransactionIdentifier() == transactionIdentifier) &&
                 (p.getUnitIdentifier() == unitId)))
             .unwrap(ModbusTcpADU::getPdu)
             .handle(responsePdu -> {
-                transaction.endRequest();
+                completeTransaction(transaction, transactionFinished);
                 // We really don't care about what we got back. As long as it's a Modbus PDU, we're ok.
                 future.complete(new DefaultPlcPingResponse(pingRequest, PlcResponseCode.OK));
             }));
@@ -126,10 +134,17 @@ public class ModbusTcpProtocolLogic extends ModbusProtocolLogic<ModbusTcpADU> im
             }
             ModbusTcpADU modbusTcpADU = new ModbusTcpADU(transactionIdentifier, unitId, requestPdu);
             RequestTransactionManager.RequestTransaction transaction = tm.startRequest();
+            AtomicBoolean transactionFinished = new AtomicBoolean(false);
             transaction.submit(() -> conversationContext.sendRequest(modbusTcpADU)
                 .expectResponse(ModbusTcpADU.class, requestTimeout)
-                .onTimeout(future::completeExceptionally)
-                .onError((p, e) -> future.completeExceptionally(e))
+                .onTimeout(e -> {
+                    future.completeExceptionally(e);
+                    completeTransaction(transaction, transactionFinished);
+                })
+                .onError((p, e) -> {
+                    future.completeExceptionally(e);
+                    completeTransaction(transaction, transactionFinished);
+                })
                 .check(p -> ((p.getTransactionIdentifier() == transactionIdentifier) &&
                     (p.getUnitIdentifier() == unitId)))
                 .unwrap(ModbusTcpADU::getPdu)
@@ -162,7 +177,7 @@ public class ModbusTcpProtocolLogic extends ModbusProtocolLogic<ModbusTcpADU> im
                     future.complete(response);
 
                     // Finish the request-transaction.
-                    transaction.endRequest();
+                    completeTransaction(transaction, transactionFinished);
                 }));
         } else {
             future.completeExceptionally(new PlcRuntimeException("Modbus only supports single filed requests"));
@@ -195,10 +210,17 @@ public class ModbusTcpProtocolLogic extends ModbusProtocolLogic<ModbusTcpADU> im
             }
             ModbusTcpADU modbusTcpADU = new ModbusTcpADU(transactionIdentifier, unitId, requestPdu);
             RequestTransactionManager.RequestTransaction transaction = tm.startRequest();
+            AtomicBoolean transactionFinished = new AtomicBoolean(false);
             transaction.submit(() -> conversationContext.sendRequest(modbusTcpADU)
                 .expectResponse(ModbusTcpADU.class, requestTimeout)
-                .onTimeout(future::completeExceptionally)
-                .onError((p, e) -> future.completeExceptionally(e))
+                .onTimeout(e -> {
+                    future.completeExceptionally(e);
+                    completeTransaction(transaction, transactionFinished);
+                })
+                .onError((p, e) -> {
+                    future.completeExceptionally(e);
+                    completeTransaction(transaction, transactionFinished);
+                })
                 .check(p -> p.getTransactionIdentifier() == transactionIdentifier)
                 .unwrap(ModbusTcpADU::getPdu)
                 .handle(responsePdu -> {
@@ -227,13 +249,19 @@ public class ModbusTcpProtocolLogic extends ModbusProtocolLogic<ModbusTcpADU> im
                     future.complete(response);
 
                     // Finish the request-transaction.
-                    transaction.endRequest();
+                    completeTransaction(transaction, transactionFinished);
                 }));
 
         } else {
             future.completeExceptionally(new PlcRuntimeException("Modbus only supports single filed requests"));
         }
         return future;
+    }
+
+    private void completeTransaction(RequestTransactionManager.RequestTransaction transaction, AtomicBoolean transactionFinished) {
+        if (transactionFinished.compareAndSet(false, true)) {
+            transaction.endRequest();
+        }
     }
 
 }
