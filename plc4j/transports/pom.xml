@@ -47,6 +47,7 @@
     <subproject>test</subproject>
     <subproject>tls</subproject>
     <subproject>tcp</subproject>
+    <subproject>tcp-server</subproject>
     <subproject>udp</subproject>
   </subprojects>
 
