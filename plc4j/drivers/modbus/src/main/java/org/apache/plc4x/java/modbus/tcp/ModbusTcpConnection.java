@@ -269,7 +269,10 @@ public class ModbusTcpConnection extends PollingSubscriptionConnectionBase<Modbu
             ModbusReadOptimizer optimizer, ModbusReadOptimizer.OptimizedRead optimizedRead) {
         ModbusTag mergedTag = optimizedRead.mergedTag;
         ModbusPDU requestPdu = getReadRequestPdu(mergedTag);
-        short unitId = getUnitId(mergedTag);
+        // The merged tag drops per-tag config (e.g. device-id in TCP server mode), so resolve the
+        // unit-id from the first original tag. All tags in one optimized block belong to the same
+        // device, so the first tag's config is representative for the whole block.
+        short unitId = getUnitId(optimizedRead.originalTagNames.values().iterator().next());
         int transactionId = nextTransactionId();
 
         ModbusTcpADU modbusTcpADU = new ModbusTcpADU(transactionId, unitId, requestPdu);
@@ -375,7 +378,7 @@ public class ModbusTcpConnection extends PollingSubscriptionConnectionBase<Modbu
     // Modbus Protocol Helpers (inlined from the old ModbusProtocolLogic)
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    private short getUnitId(PlcTag tag) {
+    protected short getUnitId(PlcTag tag) {
         if (tag instanceof ModbusTag modbusTag) {
             Short unitId = modbusTag.getUnitId();
             return unitId != null ? unitId : (short) getConfiguration().getDefaultUnitIdentifier();
