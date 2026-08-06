@@ -37,7 +37,7 @@ Apache PLC4X driver for DL/T 645-2007 China Smart Meter Communication Protocol.
 <dependency>
     <groupId>org.apache.plc4x</groupId>
     <artifactId>plc4j-driver-dlt645</artifactId>
-    <version>0.14.0-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -83,14 +83,12 @@ try (PlcConnection connection = PlcDriverManager.getDefault()
 
 ```java
 // Listen for inbound meter connections with fixed-length registration (16 bytes IMEI)
-try (PlcConnection connection = PlcDriverManager.getDefault()
+// The connection is already a Dlt645ServerConnection.
+try (Dlt645ServerConnection server = (Dlt645ServerConnection) PlcDriverManager.getDefault()
         .getConnectionManager()
-        .getConnection("dlt645-server:tcpserver://0.0.0.0:8899"
-            + "?registration-type=fixed&registration-length=16"
+        .getConnection("dlt645-server:tcp-server://0.0.0.0:8899"
+            + "?tcp-server.registration-type=fixed&tcp-server.registration-length=16"
             + "&password=12345678&operator-code=00000000")) {
-
-    // Wrap as Dlt645ServerConnection
-    Dlt645ServerConnection server = Dlt645ServerConnection.of(connection);
 
     // Event-driven device discovery
     server.onDeviceConnected(event ->
@@ -123,7 +121,11 @@ try (PlcConnection connection = PlcDriverManager.getDefault()
 #### Multiple Devices
 
 ```java
-Dlt645ServerConnection server = Dlt645ServerConnection.of(connection);
+// The server connection object IS a Dlt645ServerConnection (no wrapper needed).
+Dlt645ServerConnection server = (Dlt645ServerConnection) PlcDriverManager.getDefault()
+        .getConnectionManager()
+        .getConnection("dlt645-server:tcp-server://0.0.0.0:8899"
+            + "?tcp-server.registration-type=fixed&tcp-server.registration-length=16");
 
 // Each device gets its own sub-connection
 Dlt645DeviceConnection meter1 = server.getDeviceConnection("DTU_001");
@@ -147,8 +149,8 @@ for (String deviceId : devices) {
 // DTU sends "REG:IMEI123456\r\n" as registration packet
 try (PlcConnection connection = PlcDriverManager.getDefault()
         .getConnectionManager()
-        .getConnection("dlt645-server:tcpserver://0.0.0.0:8899"
-            + "?registration-type=regex&registration-pattern=REG:(.+)\\r\\n")) {
+        .getConnection("dlt645-server:tcp-server://0.0.0.0:8899"
+            + "?tcp-server.registration-type=regex&tcp-server.registration-pattern=REG:(.+)\\r\\n")) {
     // ...
 }
 ```
@@ -165,13 +167,13 @@ dlt645:tcp://<host>:<port>?<options>
 ### Server Mode
 
 ```
-dlt645-server:tcpserver://<bind-address>:<port>?<options>
+dlt645-server:tcp-server://<bind-address>:<port>?<options>
 
 # Examples:
-dlt645-server:tcpserver://0.0.0.0:8899?registration-type=fixed&registration-length=16
-dlt645-server:tcpserver://0.0.0.0:8899?registration-type=regex&registration-pattern=REG:(.+)\r\n
-dlt645-server:tcpserver://0.0.0.0:8899?registration-type=prefix&registration-prefix-bytes=2
-dlt645-server:tcpserver://0.0.0.0:8899?registration-type=delimiter&registration-delimiter=CRLF
+dlt645-server:tcp-server://0.0.0.0:8899?tcp-server.registration-type=fixed&tcp-server.registration-length=16
+dlt645-server:tcp-server://0.0.0.0:8899?tcp-server.registration-type=regex&tcp-server.registration-pattern=REG:(.+)\r\n
+dlt645-server:tcp-server://0.0.0.0:8899?tcp-server.registration-type=prefix&tcp-server.registration-prefix-bytes=2
+dlt645-server:tcp-server://0.0.0.0:8899?tcp-server.registration-type=delimiter&tcp-server.registration-delimiter=CRLF
 ```
 
 ## Configuration Parameters
@@ -220,22 +222,22 @@ DTU devices typically send a registration packet (e.g., IMEI) upon connection.
 
 **`fixed`** - Fixed-length registration frame (e.g., 16-byte IMEI):
 ```
-dlt645-server:tcpserver://0.0.0.0:8899?registration-type=fixed&registration-length=16
+dlt645-server:tcp-server://0.0.0.0:8899?tcp-server.registration-type=fixed&tcp-server.registration-length=16
 ```
 
 **`regex`** - Pattern-based extraction (e.g., `REG:IMEI\r\n`):
 ```
-dlt645-server:tcpserver://0.0.0.0:8899?registration-type=regex&registration-pattern=REG:(.+)\r\n
+dlt645-server:tcp-server://0.0.0.0:8899?tcp-server.registration-type=regex&tcp-server.registration-pattern=REG:(.+)\r\n
 ```
 
 **`prefix`** - Variable-length with length prefix:
 ```
-dlt645-server:tcpserver://0.0.0.0:8899?registration-type=prefix&registration-prefix-bytes=2
+dlt645-server:tcp-server://0.0.0.0:8899?tcp-server.registration-type=prefix&tcp-server.registration-prefix-bytes=2
 ```
 
 **`delimiter`** - Delimiter-separated (CRLF, LF, NULL):
 ```
-dlt645-server:tcpserver://0.0.0.0:8899?registration-type=delimiter&registration-delimiter=CRLF
+dlt645-server:tcp-server://0.0.0.0:8899?tcp-server.registration-type=delimiter&tcp-server.registration-delimiter=CRLF
 ```
 
 ## Tag Address Format

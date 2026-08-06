@@ -55,16 +55,16 @@ modbus-tcp-server:tcp-server://0.0.0.0:502
 modbus-tcp-server:tcp-server://192.168.1.100:8502
 
 // 使用固定长度注册包（16 字节）
-modbus-tcp-server:tcp-server://0.0.0.0:502?registration-type=fixed&registration-length=16
+modbus-tcp-server:tcp-server://0.0.0.0:502?tcp-server.registration-type=fixed&tcp-server.registration-length=16
 
 // 使用正则表达式注册包
-modbus-tcp-server:tcp-server://0.0.0.0:502?registration-type=regex&registration-pattern=REG:(.+)\\r\\n
+modbus-tcp-server:tcp-server://0.0.0.0:502?tcp-server.registration-type=regex&tcp-server.registration-pattern=REG:(.+)\\r\\n
 
 // 使用前缀长度注册包（2 字节长度头）
-modbus-tcp-server:tcp-server://0.0.0.0:502?registration-type=prefix&registration-prefix-bytes=2
+modbus-tcp-server:tcp-server://0.0.0.0:502?tcp-server.registration-type=prefix&tcp-server.registration-prefix-bytes=2
 
 // 使用分隔符注册包（CRLF 结尾）
-modbus-tcp-server:tcp-server://0.0.0.0:502?registration-type=delimiter&registration-delimiter=CRLF
+modbus-tcp-server:tcp-server://0.0.0.0:502?tcp-server.registration-type=delimiter&tcp-server.registration-delimiter=CRLF
 ```
 
 ## 配置参数
@@ -150,7 +150,7 @@ holding-register:1:INT{device-id:"DEVICE001",unit-id:2}
 "DEVICE0001      " (16 字节，右侧填充空格)
 ```
 
-配置：`registration-type=fixed&registration-length=16&registration-charset=UTF-8`
+配置：`tcp-server.registration-type=fixed&tcp-server.registration-length=16&tcp-server.registration-charset=UTF-8`
 
 ### 2. 正则表达式 (regex)
 
@@ -165,7 +165,7 @@ holding-register:1:INT{device-id:"DEVICE001",unit-id:2}
 模式：REG:(?<deviceId>.+)\r\n
 ```
 
-配置：`registration-type=regex&registration-pattern=REG:(?<deviceId>.+)\\r\\n&registration-max-length=64`
+配置：`tcp-server.registration-type=regex&tcp-server.registration-pattern=REG:(?<deviceId>.+)\\r\\n&tcp-server.registration-max-length=64`
 
 ### 3. 前缀长度 (prefix)
 
@@ -180,7 +180,7 @@ holding-register:1:INT{device-id:"DEVICE001",unit-id:2}
 00 0A | D E V I C E 0 0 0 1
 ```
 
-配置：`registration-type=prefix&registration-prefix-bytes=2&registration-byte-order=BIG_ENDIAN`
+配置：`tcp-server.registration-type=prefix&tcp-server.registration-prefix-bytes=2&tcp-server.registration-byte-order=BIG_ENDIAN`
 
 ### 4. 分隔符 (delimiter)
 
@@ -194,7 +194,7 @@ holding-register:1:INT{device-id:"DEVICE001",unit-id:2}
 示例："DEVICE001\r\n"
 ```
 
-配置：`registration-type=delimiter&registration-delimiter=CRLF&registration-max-length=128`
+配置：`tcp-server.registration-type=delimiter&tcp-server.registration-delimiter=CRLF&tcp-server.registration-max-length=128`
 
 ## 架构
 
