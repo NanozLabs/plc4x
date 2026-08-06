@@ -28,15 +28,14 @@ import org.apache.plc4x.java.dlt645.readwrite.utils.DataIdentifiers;
 import org.apache.plc4x.java.dlt645.tag.Dlt645Tag;
 import org.apache.plc4x.java.dlt645.tag.Dlt645WildcardTag;
 import org.apache.plc4x.java.dlt645.tag.Dlt645WildcardTag.SubTagMapping;
-import org.apache.plc4x.java.spi.context.DriverContext;
-import org.apache.plc4x.java.spi.messages.DefaultPlcReadRequest;
-import org.apache.plc4x.java.spi.messages.DefaultPlcReadResponse;
-import org.apache.plc4x.java.spi.messages.DefaultPlcWriteRequest;
-import org.apache.plc4x.java.spi.messages.utils.DefaultPlcResponseItem;
-import org.apache.plc4x.java.spi.messages.utils.DefaultPlcTagItem;
-import org.apache.plc4x.java.spi.messages.utils.DefaultPlcTagValueItem;
-import org.apache.plc4x.java.spi.messages.utils.PlcResponseItem;
-import org.apache.plc4x.java.spi.optimizer.BaseOptimizer;
+import org.apache.plc4x.java.spi.drivers.functions.PlcWriter;
+import org.apache.plc4x.java.spi.drivers.messages.DefaultPlcReadRequest;
+import org.apache.plc4x.java.spi.drivers.messages.DefaultPlcReadResponse;
+import org.apache.plc4x.java.spi.drivers.messages.DefaultPlcWriteRequest;
+import org.apache.plc4x.java.spi.drivers.messages.items.DefaultPlcResponseItem;
+import org.apache.plc4x.java.spi.drivers.messages.items.DefaultPlcTagItem;
+import org.apache.plc4x.java.spi.drivers.messages.items.DefaultPlcTagValueItem;
+import org.apache.plc4x.java.spi.drivers.messages.items.PlcResponseItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,19 +52,21 @@ import java.util.*;
  * C-phase voltage (02010300) becomes one wildcard read of 0201FF00.
  * <p>
  * Tags that cannot form a wildcard group (singleton or mixed-prefix) fall back
- * to individual single-tag requests (same as {@code SingleTagOptimizer}).
+ * to individual single-tag requests.
  * <p>
  * Write requests always use single-tag splitting (DL/T 645 does not support wildcard writes).
  */
-public class Dlt645BlockOptimizer extends BaseOptimizer {
+public class Dlt645BlockOptimizer {
 
     private static final Logger logger = LoggerFactory.getLogger(Dlt645BlockOptimizer.class);
 
     /** Minimum group size to trigger wildcard merging (2+ tags needed) */
     private static final int MIN_WILDCARD_GROUP_SIZE = 2;
 
-    @Override
-    protected List<PlcReadRequest> processReadRequest(PlcReadRequest readRequest, DriverContext driverContext) {
+    /**
+     * Split a multi-tag read request into a list of sub-requests (wildcard blocks + single tags).
+     */
+    public List<PlcReadRequest> processReadRequest(PlcReadRequest readRequest) {
         if (readRequest.getNumberOfTags() <= 1) {
             return Collections.singletonList(readRequest);
         }
@@ -119,10 +120,11 @@ public class Dlt645BlockOptimizer extends BaseOptimizer {
         return subRequests;
     }
 
-    @Override
-    protected PlcReadResponse processReadResponses(PlcReadRequest readRequest,
-                                                    Map<PlcReadRequest, SubResponse<PlcReadResponse>> readResponses,
-                                                    DriverContext driverContext) {
+    /**
+     * Merge per-sub-request responses back into the original request's response.
+     */
+    public PlcReadResponse processReadResponses(PlcReadRequest readRequest,
+                                                Map<PlcReadRequest, SubResponse<PlcReadResponse>> readResponses) {
         Map<String, PlcResponseItem<PlcValue>> resultTags = new HashMap<>();
 
         for (var entry : readResponses.entrySet()) {
@@ -181,9 +183,10 @@ public class Dlt645BlockOptimizer extends BaseOptimizer {
         return new DefaultPlcReadResponse(readRequest, resultTags);
     }
 
-    @Override
-    protected List<PlcWriteRequest> processWriteRequest(PlcWriteRequest writeRequest, DriverContext driverContext) {
-        // DL/T 645 does not support wildcard writes; always split to single-tag
+    /**
+     * DL/T 645 does not support wildcard writes; always split to single-tag.
+     */
+    public List<PlcWriteRequest> processWriteRequest(PlcWriteRequest writeRequest, PlcWriter writer) {
         if (writeRequest.getNumberOfTags() == 1) {
             return Collections.singletonList(writeRequest);
         }
@@ -192,11 +195,32 @@ public class Dlt645BlockOptimizer extends BaseOptimizer {
             PlcTag tag = writeRequest.getTag(tagName);
             PlcValue value = writeRequest.getPlcValue(tagName);
             subRequests.add(new DefaultPlcWriteRequest(
-                ((DefaultPlcWriteRequest) writeRequest).getWriter(),
+                writer,
                 new LinkedHashMap<>(Collections.singletonMap(
                     tagName, new DefaultPlcTagValueItem<>(tag, value)))));
         }
         return subRequests;
+    }
+
+    /**
+     * Wrapper for a sub-request's response plus success flag.
+     */
+    public static class SubResponse<R> {
+        private final R response;
+        private final boolean success;
+
+        public SubResponse(R response, boolean success) {
+            this.response = response;
+            this.success = success;
+        }
+
+        public R getResponse() {
+            return response;
+        }
+
+        public boolean isSuccess() {
+            return success;
+        }
     }
 
     // ========== Grouping Logic ==========
@@ -213,12 +237,6 @@ public class Dlt645BlockOptimizer extends BaseOptimizer {
         LinkedHashMap<String, Dlt645Tag> tags) {
 
         if (tags.isEmpty()) return Collections.emptyList();
-
-        // Compute a "prefix key" for each tag: mask out each possible byte position and see
-        // which grouping yields valid wildcard candidates.
-        // Strategy: group by (DI3, DI2, ?, DI0) — the most common DLT645 pattern (DI1 varies for phases).
-        // Then try (DI3, DI2, DI1, ?) for rate variations.
-        // Then try other positions.
 
         // Try all 4 positions, pick the one that produces the largest mergeable groups
         var bestGroups = new ArrayList<LinkedHashMap<String, Dlt645Tag>>();

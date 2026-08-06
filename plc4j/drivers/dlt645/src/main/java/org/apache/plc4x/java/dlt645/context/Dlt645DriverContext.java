@@ -18,27 +18,16 @@
  */
 package org.apache.plc4x.java.dlt645.context;
 
-import org.apache.plc4x.java.dlt645.config.Dlt645Configuration;
-import org.apache.plc4x.java.spi.configuration.HasConfiguration;
-import org.apache.plc4x.java.spi.context.DriverContext;
+/**
+ * DL/T 645-2007 helper utilities for the driver.
+ * <p>
+ * In SPI3 the old DriverContext class hierarchy was removed; only the static
+ * meter-address parsing helper is retained here.
+ */
+public final class Dlt645DriverContext {
 
-public class Dlt645DriverContext implements DriverContext, HasConfiguration<Dlt645Configuration> {
-
-    private byte[] meterAddress;
-    private int requestTimeout;
-
-    @Override
-    public void setConfiguration(Dlt645Configuration configuration) {
-        this.meterAddress = parseMeterAddress(configuration.getMeterAddress());
-        this.requestTimeout = configuration.getRequestTimeout();
-    }
-
-    public byte[] getMeterAddress() {
-        return meterAddress;
-    }
-
-    public int getRequestTimeout() {
-        return requestTimeout;
+    private Dlt645DriverContext() {
+        // Utility class
     }
 
     /**

@@ -19,10 +19,9 @@
 package org.apache.plc4x.java.dlt645.readwrite.utils;
 
 import org.apache.plc4x.java.dlt645.readwrite.ControlCode;
-import org.apache.plc4x.java.spi.generation.ParseException;
-import org.apache.plc4x.java.spi.generation.ReadBuffer;
-import org.apache.plc4x.java.spi.generation.SerializationException;
-import org.apache.plc4x.java.spi.generation.WriteBuffer;
+import org.apache.plc4x.java.spi.buffers.api.ReadBuffer;
+import org.apache.plc4x.java.spi.buffers.api.WriteBuffer;
+import org.apache.plc4x.java.spi.buffers.api.exceptions.BufferException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -122,7 +121,7 @@ public class StaticHelper {
         try {
             short wireByte = readBuffer.readUnsignedShort(8);
             return decode33((byte) (wireByte & 0xFF));
-        } catch (ParseException e) {
+        } catch (BufferException e) {
             return 0;
         }
     }
@@ -133,7 +132,7 @@ public class StaticHelper {
     public static void serializeDataBytePlus33(WriteBuffer writeBuffer, byte plainByte) {
         try {
             writeBuffer.writeUnsignedShort(8, (short) (encode33(plainByte) & 0xFF));
-        } catch (SerializationException e) {
+        } catch (BufferException e) {
             // Keep behavior consistent with other helper implementations.
         }
     }

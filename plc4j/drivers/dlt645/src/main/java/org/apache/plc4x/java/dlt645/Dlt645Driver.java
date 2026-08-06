@@ -18,26 +18,24 @@
  */
 package org.apache.plc4x.java.dlt645;
 
-import io.netty.buffer.ByteBuf;
-import org.apache.plc4x.java.dlt645.config.Dlt645Configuration;
-import org.apache.plc4x.java.dlt645.context.Dlt645DriverContext;
-import org.apache.plc4x.java.dlt645.protocol.Dlt645ProtocolLogic;
-import org.apache.plc4x.java.dlt645.readwrite.Dlt645Frame;
-import org.apache.plc4x.java.dlt645.readwrite.utils.StaticHelper;
 import org.apache.plc4x.java.api.model.PlcTag;
+import org.apache.plc4x.java.dlt645.config.Dlt645Configuration;
+import org.apache.plc4x.java.dlt645.protocol.Dlt645Connection;
 import org.apache.plc4x.java.dlt645.tag.Dlt645CommandTag;
 import org.apache.plc4x.java.dlt645.tag.Dlt645Tag;
-import org.apache.plc4x.java.spi.configuration.PlcConnectionConfiguration;
-import org.apache.plc4x.java.spi.connection.GeneratedDriverBase;
-import org.apache.plc4x.java.spi.connection.ProtocolStackConfigurer;
-import org.apache.plc4x.java.spi.connection.SingleProtocolStackConfigurer;
-import org.apache.plc4x.java.dlt645.optimizer.Dlt645BlockOptimizer;
-import org.apache.plc4x.java.spi.optimizer.BaseOptimizer;
+import org.apache.plc4x.java.spi.config.Configuration;
+import org.apache.plc4x.java.spi.drivers.ConnectionBase;
+import org.apache.plc4x.java.spi.drivers.DriverBase;
+import org.apache.plc4x.java.spi.transports.api.Transport;
+import org.apache.plc4x.java.spi.transports.api.TransportInstance;
+import org.apache.plc4x.java.transport.serial.SerialTransport;
+import org.apache.plc4x.java.transport.tcp.TcpTransport;
+import org.apache.plc4x.java.utils.auditlog.api.AuditLog;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.ToIntFunction;
+import java.util.Set;
 
 /**
  * PLC4X Driver for DL/T 645-2007 (China Smart Meter Communication Protocol).
@@ -50,7 +48,7 @@ import java.util.function.ToIntFunction;
  *   <li>{@code dlt645:tcp://192.168.1.100:8899?meter-address=123456789012}</li>
  * </ul>
  */
-public class Dlt645Driver extends GeneratedDriverBase<Dlt645Frame> {
+public class Dlt645Driver extends DriverBase {
 
     @Override
     public String getProtocolCode() {
@@ -63,28 +61,18 @@ public class Dlt645Driver extends GeneratedDriverBase<Dlt645Frame> {
     }
 
     @Override
-    protected Class<? extends PlcConnectionConfiguration> getConfigurationClass() {
+    protected Class<? extends Configuration> getConfigurationClass() {
         return Dlt645Configuration.class;
     }
 
     @Override
-    protected Optional<String> getDefaultTransportCode() {
+    public Optional<String> getDefaultTransportCode() {
         return Optional.of("serial");
     }
 
     @Override
-    protected List<String> getSupportedTransportCodes() {
+    public List<String> getSupportedTransportCodes() {
         return Arrays.asList("tcp", "serial");
-    }
-
-    @Override
-    protected boolean awaitSetupComplete() {
-        return false;
-    }
-
-    @Override
-    protected boolean awaitDisconnectComplete() {
-        return false;
     }
 
     @Override
@@ -103,19 +91,10 @@ public class Dlt645Driver extends GeneratedDriverBase<Dlt645Frame> {
     }
 
     @Override
-    protected BaseOptimizer getOptimizer() {
-        return new Dlt645BlockOptimizer();
-    }
-
-    @Override
-    protected ProtocolStackConfigurer<Dlt645Frame> getStackConfigurer() {
-        return SingleProtocolStackConfigurer.builder(
-                Dlt645Frame.class,
-                io -> Dlt645Frame.staticParse(io, true))
-            .withProtocol(Dlt645ProtocolLogic.class)
-            .withDriverContext(Dlt645DriverContext.class)
-            .withPacketSizeEstimator(Dlt645ByteLengthEstimator.class)
-            .build();
+    protected ConnectionBase<Dlt645Configuration> getConnection(Configuration configuration,
+                                                                TransportInstance<?> transportInstance,
+                                                                AuditLog auditLog) {
+        return new Dlt645Connection((Dlt645Configuration) configuration, transportInstance, auditLog);
     }
 
     @Override
@@ -126,40 +105,8 @@ public class Dlt645Driver extends GeneratedDriverBase<Dlt645Frame> {
         return Dlt645Tag.of(tagAddress);
     }
 
-    /**
-     * Estimate packet size for DL/T 645-2007 frames.
-     * <p>
-     * Frame: 68H + address(6) + 68H + control + length + data(length) + CS + 16H
-     * Total = 12 + length bytes.
-     */
-    public static class Dlt645ByteLengthEstimator implements ToIntFunction<ByteBuf> {
-        @Override
-        public int applyAsInt(ByteBuf byteBuf) {
-            if (byteBuf.readableBytes() < 10) {
-                return -1;
-            }
-
-            var readerIndex = byteBuf.readerIndex();
-            var buf = new byte[byteBuf.readableBytes()];
-            byteBuf.getBytes(readerIndex, buf);
-
-            // Find frame start (0x68 at offset 0, 0x68 at offset 7)
-            var frameStart = StaticHelper.findFrameStart(buf);
-            if (frameStart < 0) {
-                return -1;
-            }
-
-            // Skip garbage bytes before frame start
-            if (frameStart > 0) {
-                byteBuf.skipBytes(frameStart);
-                return -1;
-            }
-
-            var frameLength = StaticHelper.estimateFrameLength(buf, 0);
-            if (frameLength < 0) {
-                return -1;
-            }
-            return frameLength;
-        }
+    @Override
+    public Set<Integer> defaultPorts(String transportCode) {
+        return Set.of(8899);
     }
 }

@@ -18,13 +18,16 @@
  */
 package org.apache.plc4x.java.dlt645.protocol;
 
+import org.apache.plc4x.java.api.exceptions.PlcConnectionException;
 import org.apache.plc4x.java.api.exceptions.PlcRuntimeException;
 import org.apache.plc4x.java.api.messages.*;
 import org.apache.plc4x.java.api.model.PlcTag;
+import org.apache.plc4x.java.api.types.ConnectionStateChangeType;
 import org.apache.plc4x.java.api.types.PlcResponseCode;
 import org.apache.plc4x.java.api.value.PlcValue;
 import org.apache.plc4x.java.dlt645.config.Dlt645Configuration;
 import org.apache.plc4x.java.dlt645.context.Dlt645DriverContext;
+import org.apache.plc4x.java.dlt645.optimizer.Dlt645BlockOptimizer;
 import org.apache.plc4x.java.dlt645.readwrite.ControlCode;
 import org.apache.plc4x.java.dlt645.readwrite.Dlt645Frame;
 import org.apache.plc4x.java.dlt645.readwrite.utils.DataIdentifiers;
@@ -33,28 +36,36 @@ import org.apache.plc4x.java.dlt645.tag.Dlt645CommandTag;
 import org.apache.plc4x.java.dlt645.tag.Dlt645CommandTag.CommandType;
 import org.apache.plc4x.java.dlt645.tag.Dlt645Tag;
 import org.apache.plc4x.java.dlt645.tag.Dlt645TagHandler;
-import org.apache.plc4x.java.spi.ConversationContext;
-import org.apache.plc4x.java.spi.Plc4xProtocolBase;
-import org.apache.plc4x.java.spi.configuration.HasConfiguration;
-import org.apache.plc4x.java.spi.connection.PlcTagHandler;
-import org.apache.plc4x.java.spi.messages.*;
-import org.apache.plc4x.java.spi.messages.utils.DefaultPlcResponseItem;
-import org.apache.plc4x.java.spi.transaction.RequestTransactionManager;
+import org.apache.plc4x.java.spi.drivers.exceptions.MessageCodecException;
+import org.apache.plc4x.java.spi.drivers.messages.*;
+import org.apache.plc4x.java.spi.drivers.messages.items.DefaultPlcResponseItem;
+import org.apache.plc4x.java.spi.drivers.messages.items.PlcResponseItem;
+import org.apache.plc4x.java.spi.drivers.tags.PlcTagHandler;
+import org.apache.plc4x.java.spi.transports.api.TransportInstance;
+import org.apache.plc4x.java.spi.values.DefaultPlcValueHandler;
 import org.apache.plc4x.java.spi.values.PlcLREAL;
 import org.apache.plc4x.java.spi.values.PlcSTRING;
 import org.apache.plc4x.java.spi.values.PlcStruct;
+import org.apache.plc4x.java.spi.values.PlcValueHandler;
+import org.apache.plc4x.java.utils.auditlog.api.AuditLog;
+import org.apache.plc4x.java.utils.auditlog.api.AuditLogEventType;
+import org.apache.plc4x.java.utils.subscriptionemulation.PollingSubscriptionConnectionBase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
- * DL/T 645-2007 Protocol Logic (Client mode).
+ * DL/T 645-2007 Connection (Client mode).
  * <p>
  * Supports:
  * <ul>
@@ -70,10 +81,9 @@ import java.util.concurrent.CompletableFuture;
  *   <li>Clear event (0x1B) via {@code cmd:clear-event}</li>
  * </ul>
  */
-public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
-    implements HasConfiguration<Dlt645Configuration> {
+public class Dlt645Connection extends PollingSubscriptionConnectionBase<Dlt645Configuration> {
 
-    private static final Logger logger = LoggerFactory.getLogger(Dlt645ProtocolLogic.class);
+    private static final Logger logger = LoggerFactory.getLogger(Dlt645Connection.class);
 
     /** Broadcast address per DL/T 645-2007: 0x99 x 6 */
     private static final byte[] BROADCAST_ADDRESS = {
@@ -81,19 +91,111 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
         (byte) 0x99, (byte) 0x99, (byte) 0x99
     };
 
-    private Duration requestTimeout;
+    private Dlt645MessageCodec messageCodec;
+
+    // DL/T 645 is a single-outstanding-transaction protocol: requests are chained
+    // so only one frame is in flight at a time. The pending future keyed by a
+    // monotonically increasing request id is completed by handleIncomingMessage.
+    private final Map<Long, CompletableFuture<Dlt645Frame>> pendingRequests = new ConcurrentHashMap<>();
+    private final Object requestChainLock = new Object();
+    private CompletableFuture<?> requestTail = CompletableFuture.completedFuture(null);
+    private long requestIdGenerator = 0;
+
     private byte[] meterAddress;
     private byte[] password;
     private byte[] operatorCode;
-    private RequestTransactionManager tm;
+
+    public Dlt645Connection(Dlt645Configuration configuration, TransportInstance<?> transportInstance, AuditLog auditLog) {
+        super(configuration, transportInstance, auditLog);
+    }
 
     @Override
-    public void setConfiguration(Dlt645Configuration configuration) {
-        this.requestTimeout = Duration.ofMillis(configuration.getRequestTimeout());
-        this.meterAddress = Dlt645DriverContext.parseMeterAddress(configuration.getMeterAddress());
-        this.password = parseHexField(configuration.getPassword(), 4);
-        this.operatorCode = parseHexField(configuration.getOperatorCode(), 4);
-        this.tm = new RequestTransactionManager(1);
+    protected void onConnect() throws PlcConnectionException {
+        this.meterAddress = Dlt645DriverContext.parseMeterAddress(getConfiguration().getMeterAddress());
+        this.password = parseHexField(getConfiguration().getPassword(), 4);
+        this.operatorCode = parseHexField(getConfiguration().getOperatorCode(), 4);
+
+        messageCodec = new Dlt645MessageCodec(transportInstance, this::handleIncomingMessage);
+
+        startReceiving(() -> {
+            try {
+                messageCodec.processIncomingData();
+            } catch (MessageCodecException e) {
+                logger.error("Error processing incoming Dlt645 data", e);
+            }
+        });
+
+        logger.info("DL/T 645-2007 connection established");
+        if (auditLog.isEnabled()) {
+            auditLog.write(AuditLogEventType.CONNECT, "DL/T 645-2007 connection established");
+        }
+        fireConnectionStateChanged(ConnectionStateChangeType.CONNECTED, null);
+    }
+
+    @Override
+    public boolean isConnected() {
+        return messageCodec != null && messageCodec.isOpen();
+    }
+
+    @Override
+    public void close() throws Exception {
+        stopReceiving();
+        if (messageCodec != null) {
+            messageCodec.close();
+        }
+        pendingRequests.values().forEach(pending ->
+            pending.completeExceptionally(new PlcRuntimeException("Connection closed")));
+        pendingRequests.clear();
+        super.close();
+        logger.info("DL/T 645-2007 connection closed");
+        fireConnectionStateChanged(ConnectionStateChangeType.DISCONNECTED, null);
+    }
+
+    @Override
+    protected void onTransportDisconnected(Throwable cause) {
+        super.onTransportDisconnected(cause);
+        fireConnectionStateChanged(ConnectionStateChangeType.CONNECTION_LOST,
+            cause != null ? cause.getMessage() : "Connection closed by remote");
+
+        PlcRuntimeException exception = new PlcRuntimeException(
+            cause != null ? "Connection lost: " + cause.getMessage() : "Connection closed by remote", cause);
+        int pendingCount = pendingRequests.size();
+        if (pendingCount > 0) {
+            logger.warn("Failing {} pending requests due to transport disconnect", pendingCount);
+            pendingRequests.values().forEach(pending -> pending.completeExceptionally(exception));
+            pendingRequests.clear();
+        }
+    }
+
+    @Override
+    protected PlcTagHandler getTagHandler() {
+        return new Dlt645TagHandler();
+    }
+
+    @Override
+    protected PlcValueHandler getValueHandler() {
+        return new DefaultPlcValueHandler();
+    }
+
+    @Override
+    protected int getMaxConcurrentRequests() {
+        return 1;
+    }
+
+    private void handleIncomingMessage(Dlt645Frame frame) {
+        if (auditLog.isEnabled()) {
+            auditLog.write(AuditLogEventType.INCOMING_MESSAGE,
+                "Received DL/T 645 frame, control=0x" + String.format("%02X", frame.getControl().getValue()));
+        }
+        // DL/T 645 frames carry no transaction id; with a single outstanding
+        // request, complete the single pending future.
+        if (pendingRequests.isEmpty()) {
+            logger.warn("Received DL/T 645 frame but no request is pending");
+            return;
+        }
+        Map.Entry<Long, CompletableFuture<Dlt645Frame>> entry = pendingRequests.entrySet().iterator().next();
+        pendingRequests.remove(entry.getKey());
+        entry.getValue().complete(frame);
     }
 
     /**
@@ -115,54 +217,67 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
         return bytes;
     }
 
-    @Override
-    public PlcTagHandler getTagHandler() {
-        return new Dlt645TagHandler();
-    }
-
-    @Override
-    public void close(ConversationContext<Dlt645Frame> context) {
-        tm.shutdown();
-    }
-
     // ========== Ping ==========
 
     @Override
-    public CompletableFuture<PlcPingResponse> ping(PlcPingRequest pingRequest) {
-        var future = new CompletableFuture<PlcPingResponse>();
+    protected CompletableFuture<PlcPingResponse> onPing(PlcPingRequest pingRequest) {
         var diBytes = new byte[]{0x00, 0x01, 0x00, 0x00};
         var frame = buildReadDataFrame(diBytes);
-
-        var transaction = tm.startRequest();
-        transaction.submit(() -> conversationContext.sendRequest(frame)
-            .expectResponse(Dlt645Frame.class, requestTimeout)
-            .onTimeout(e -> {
-                transaction.endRequest();
-                future.completeExceptionally(e);
-            })
-            .onError((p, e) -> {
-                transaction.endRequest();
-                future.completeExceptionally(e);
-            })
-            .handle(response -> {
-                transaction.endRequest();
-                future.complete(new DefaultPlcPingResponse(pingRequest, PlcResponseCode.OK));
-            }));
-
-        return future;
+        return executeThrottled(() ->
+            sendRequest(frame).thenApply(response ->
+                new DefaultPlcPingResponse(pingRequest, PlcResponseCode.OK)
+            )
+        );
     }
 
     // ========== Read ==========
 
     @Override
-    public CompletableFuture<PlcReadResponse> read(PlcReadRequest readRequest) {
-        var future = new CompletableFuture<PlcReadResponse>();
+    protected CompletableFuture<PlcReadResponse> onRead(PlcReadRequest readRequest) {
+        var request = (DefaultPlcReadRequest) readRequest;
+
+        // Use the optimizer to split multi-tag requests into wildcard blocks / single tags.
+        var optimizer = new Dlt645BlockOptimizer();
+        List<org.apache.plc4x.java.dlt645.optimizer.Dlt645BlockOptimizer.SubResponse<PlcReadResponse>> processed = null;
+        List<CompletableFuture<PlcReadResponse>> subFutures = new java.util.ArrayList<>();
+
+        List<PlcReadRequest> subRequests;
+        try {
+            subRequests = optimizer.processReadRequest(readRequest);
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(
+                new PlcRuntimeException("Failed to split read request", e));
+        }
+
+        // DL/T 645 supports only single-tag requests; chain them sequentially.
+        CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
+        Map<PlcReadRequest, Dlt645BlockOptimizer.SubResponse<PlcReadResponse>> responses =
+            new LinkedHashMap<>();
+        for (PlcReadRequest subRequest : subRequests) {
+            CompletableFuture<PlcReadResponse> subFuture =
+                chain.thenComposeAsync(v -> executeSingleRead(subRequest));
+            subFutures.add(subFuture);
+            chain = subFuture.handle((r, e) -> {
+                if (e != null) {
+                    logger.warn("Sub-request failed: {}", e.getMessage());
+                    responses.put(subRequest, new Dlt645BlockOptimizer.SubResponse<>(null, false));
+                } else {
+                    responses.put(subRequest, new Dlt645BlockOptimizer.SubResponse<>(r, true));
+                }
+                return null;
+            });
+        }
+
+        return CompletableFuture.allOf(subFutures.toArray(new CompletableFuture[0]))
+            .thenApply(v -> optimizer.processReadResponses(readRequest, responses));
+    }
+
+    private CompletableFuture<PlcReadResponse> executeSingleRead(PlcReadRequest readRequest) {
         var request = (DefaultPlcReadRequest) readRequest;
 
         if (request.getTagNames().size() != 1) {
-            future.completeExceptionally(
+            return CompletableFuture.failedFuture(
                 new PlcRuntimeException("DL/T 645-2007 only supports single tag requests"));
-            return future;
         }
 
         var tagName = request.getTagNames().iterator().next();
@@ -172,16 +287,14 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
         if (tag instanceof Dlt645CommandTag) {
             var cmdTag = (Dlt645CommandTag) tag;
             if (cmdTag.getCommandType() != CommandType.READ_ADDRESS) {
-                future.completeExceptionally(
+                return CompletableFuture.failedFuture(
                     new PlcRuntimeException("Only cmd:read-address is supported in read requests"));
-                return future;
             }
             return executeReadAddress(request, tagName);
         }
 
         // Standard DI tag: read data (0x11)
-        var dlt645Tag = (Dlt645Tag) tag;
-        return executeReadData(request, tagName, dlt645Tag);
+        return executeReadData(request, tagName, (Dlt645Tag) tag);
     }
 
     /**
@@ -191,41 +304,31 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
     private CompletableFuture<PlcReadResponse> executeReadAddress(
         DefaultPlcReadRequest request, String tagName) {
 
-        var future = new CompletableFuture<PlcReadResponse>();
         // Read address uses broadcast address and no data
         var frame = new Dlt645Frame(BROADCAST_ADDRESS, ControlCode.READ_ADDRESS, (short) 0, new byte[0]);
 
-        var transaction = tm.startRequest();
-        transaction.submit(() -> conversationContext.sendRequest(frame)
-            .expectResponse(Dlt645Frame.class, requestTimeout)
-            .onTimeout(e -> { transaction.endRequest(); future.completeExceptionally(e); })
-            .onError((p, e) -> { transaction.endRequest(); future.completeExceptionally(e); })
-            .handle(response -> {
-                PlcValue plcValue = null;
-                PlcResponseCode responseCode;
+        return sendRequest(frame).thenApply(response -> {
+            PlcValue plcValue = null;
+            PlcResponseCode responseCode;
 
-                var controlCode = response.getControl();
-                if (controlCode == ControlCode.READ_ADDRESS_ERROR) {
-                    logger.warn("Read address error: {}", StaticHelper.describeError(response.getDataPlain()));
-                    responseCode = PlcResponseCode.REMOTE_ERROR;
-                } else if (controlCode == ControlCode.READ_ADDRESS_RESPONSE) {
-                    // Response data = 6-byte address (LSB first), convert to MSB-first string
-                    var addrBytes = response.getDataPlain();
-                    plcValue = new PlcSTRING(formatAddressMsbFirst(addrBytes));
-                    responseCode = PlcResponseCode.OK;
-                } else {
-                    logger.warn("Unexpected control code for read-address: 0x{}",
-                        String.format("%02X", controlCode.getValue()));
-                    responseCode = PlcResponseCode.INTERNAL_ERROR;
-                }
+            var controlCode = response.getControl();
+            if (controlCode == ControlCode.READ_ADDRESS_ERROR) {
+                logger.warn("Read address error: {}", StaticHelper.describeError(response.getDataPlain()));
+                responseCode = PlcResponseCode.REMOTE_ERROR;
+            } else if (controlCode == ControlCode.READ_ADDRESS_RESPONSE) {
+                // Response data = 6-byte address (LSB first), convert to MSB-first string
+                plcValue = new PlcSTRING(formatAddressMsbFirst(response.getDataPlain()));
+                responseCode = PlcResponseCode.OK;
+            } else {
+                logger.warn("Unexpected control code for read-address: 0x{}",
+                    String.format("%02X", controlCode.getValue()));
+                responseCode = PlcResponseCode.INTERNAL_ERROR;
+            }
 
-                future.complete(new DefaultPlcReadResponse(request,
-                    Collections.singletonMap(tagName,
-                        new DefaultPlcResponseItem<>(responseCode, plcValue))));
-                transaction.endRequest();
-            }));
-
-        return future;
+            return (PlcReadResponse) new DefaultPlcReadResponse(request,
+                Collections.singletonMap(tagName,
+                    new DefaultPlcResponseItem<>(responseCode, plcValue)));
+        });
     }
 
     /**
@@ -236,58 +339,46 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
     private CompletableFuture<PlcReadResponse> executeReadData(
         DefaultPlcReadRequest request, String tagName, Dlt645Tag tag) {
 
-        var future = new CompletableFuture<PlcReadResponse>();
         var frame = buildReadDataFrame(tag.getDataIdentifier());
 
-        var transaction = tm.startRequest();
-        transaction.submit(() -> conversationContext.sendRequest(frame)
-            .expectResponse(Dlt645Frame.class, requestTimeout)
-            .onTimeout(e -> { transaction.endRequest(); future.completeExceptionally(e); })
-            .onError((p, e) -> { transaction.endRequest(); future.completeExceptionally(e); })
-            .handle(response -> {
-                var controlCode = response.getControl();
+        return sendRequest(frame).thenCompose(response -> {
+            var controlCode = response.getControl();
 
-                if (controlCode == ControlCode.READ_DATA_ERROR) {
-                    logger.warn("Read error for tag {}: {}",
-                        tagName, StaticHelper.describeError(response.getDataPlain()));
-                    future.complete(new DefaultPlcReadResponse(request,
+            if (controlCode == ControlCode.READ_DATA_ERROR) {
+                logger.warn("Read error for tag {}: {}",
+                    tagName, StaticHelper.describeError(response.getDataPlain()));
+                return CompletableFuture.completedFuture(
+                    (PlcReadResponse) new DefaultPlcReadResponse(request,
                         Collections.singletonMap(tagName,
                             new DefaultPlcResponseItem<>(PlcResponseCode.REMOTE_ERROR, null))));
-                    transaction.endRequest();
-                    return;
-                }
+            }
 
-                if (controlCode == ControlCode.READ_DATA_RESPONSE) {
-                    // Single-frame response, no more data
-                    completeReadDataResponse(future, request, tagName, tag, response.getDataPlain());
-                    transaction.endRequest();
-                    return;
-                }
+            if (controlCode == ControlCode.READ_DATA_RESPONSE) {
+                // Single-frame response, no more data
+                return CompletableFuture.completedFuture(
+                    completeReadDataResponse(request, tagName, tag, response.getDataPlain()));
+            }
 
-                if (controlCode == ControlCode.READ_DATA_RESPONSE_MORE) {
-                    // D5=1: more data follows, start subsequent reads
-                    transaction.endRequest();
-                    accumulateSubsequentData(future, request, tagName, tag, response.getDataPlain(), 1);
-                    return;
-                }
+            if (controlCode == ControlCode.READ_DATA_RESPONSE_MORE) {
+                // D5=1: more data follows, start subsequent reads
+                return accumulateSubsequentData(request, tagName, tag, response.getDataPlain(), 1);
+            }
 
-                logger.warn("Unexpected control code in read response: 0x{}",
-                    String.format("%02X", controlCode.getValue()));
-                future.complete(new DefaultPlcReadResponse(request,
+            logger.warn("Unexpected control code in read response: 0x{}",
+                String.format("%02X", controlCode.getValue()));
+            return CompletableFuture.completedFuture(
+                (PlcReadResponse) new DefaultPlcReadResponse(request,
                     Collections.singletonMap(tagName,
                         new DefaultPlcResponseItem<>(PlcResponseCode.INTERNAL_ERROR, null))));
-                transaction.endRequest();
-            }));
-
-        return future;
+        });
     }
 
     /**
      * Recursively send READ_SUBSEQUENT_DATA (0x12) frames to accumulate multi-frame response.
      */
-    private void accumulateSubsequentData(
-        CompletableFuture<PlcReadResponse> future, DefaultPlcReadRequest request,
-        String tagName, Dlt645Tag tag, byte[] accumulatedData, int seqNumber) {
+    private CompletableFuture<PlcReadResponse> accumulateSubsequentData(
+        DefaultPlcReadRequest request, String tagName, Dlt645Tag tag,
+        byte[] accumulatedData, int seqNumber) {
 
         // Build READ_SUBSEQUENT_DATA frame: DI(4, reversed) + SEQ(1)
         var di = tag.getDataIdentifier();
@@ -300,46 +391,37 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
         var subFrame = new Dlt645Frame(meterAddress, ControlCode.READ_SUBSEQUENT_DATA,
             (short) dataPlain.length, dataPlain);
 
-        var transaction = tm.startRequest();
-        transaction.submit(() -> conversationContext.sendRequest(subFrame)
-            .expectResponse(Dlt645Frame.class, requestTimeout)
-            .onTimeout(e -> { transaction.endRequest(); future.completeExceptionally(e); })
-            .onError((p, e) -> { transaction.endRequest(); future.completeExceptionally(e); })
-            .handle(response -> {
-                var controlCode = response.getControl();
+        return sendRequest(subFrame).thenCompose(response -> {
+            var controlCode = response.getControl();
 
-                if (controlCode == ControlCode.READ_SUBSEQUENT_DATA_ERROR) {
-                    logger.warn("Read subsequent error for tag {}: {}",
-                        tagName, StaticHelper.describeError(response.getDataPlain()));
-                    // Return what we have accumulated so far
-                    completeReadDataResponse(future, request, tagName, tag, accumulatedData);
-                    transaction.endRequest();
-                    return;
-                }
+            if (controlCode == ControlCode.READ_SUBSEQUENT_DATA_ERROR) {
+                logger.warn("Read subsequent error for tag {}: {}",
+                    tagName, StaticHelper.describeError(response.getDataPlain()));
+                // Return what we have accumulated so far
+                return CompletableFuture.completedFuture(
+                    completeReadDataResponse(request, tagName, tag, accumulatedData));
+            }
 
-                // Merge data: skip DI(4) + SEQ(1) from subsequent response
-                var respData = response.getDataPlain();
-                var newData = mergeSubsequentData(accumulatedData, respData);
+            // Merge data: skip DI(4) + SEQ(1) from subsequent response
+            var respData = response.getDataPlain();
+            var newData = mergeSubsequentData(accumulatedData, respData);
 
-                if (controlCode == ControlCode.READ_SUBSEQUENT_DATA_RESPONSE) {
-                    // No more data
-                    completeReadDataResponse(future, request, tagName, tag, newData);
-                    transaction.endRequest();
-                    return;
-                }
+            if (controlCode == ControlCode.READ_SUBSEQUENT_DATA_RESPONSE) {
+                // No more data
+                return CompletableFuture.completedFuture(
+                    completeReadDataResponse(request, tagName, tag, newData));
+            }
 
-                if (controlCode == ControlCode.READ_SUBSEQUENT_DATA_RESPONSE_MORE) {
-                    // More data follows
-                    transaction.endRequest();
-                    accumulateSubsequentData(future, request, tagName, tag, newData, seqNumber + 1);
-                    return;
-                }
+            if (controlCode == ControlCode.READ_SUBSEQUENT_DATA_RESPONSE_MORE) {
+                // More data follows
+                return accumulateSubsequentData(request, tagName, tag, newData, seqNumber + 1);
+            }
 
-                logger.warn("Unexpected control code in subsequent read: 0x{}",
-                    String.format("%02X", controlCode.getValue()));
-                completeReadDataResponse(future, request, tagName, tag, newData);
-                transaction.endRequest();
-            }));
+            logger.warn("Unexpected control code in subsequent read: 0x{}",
+                String.format("%02X", controlCode.getValue()));
+            return CompletableFuture.completedFuture(
+                completeReadDataResponse(request, tagName, tag, newData));
+        });
     }
 
     /**
@@ -359,9 +441,8 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
         return baos.toByteArray();
     }
 
-    private void completeReadDataResponse(
-        CompletableFuture<PlcReadResponse> future, DefaultPlcReadRequest request,
-        String tagName, Dlt645Tag tag, byte[] dataPlain) {
+    private PlcReadResponse completeReadDataResponse(
+        DefaultPlcReadRequest request, String tagName, Dlt645Tag tag, byte[] dataPlain) {
 
         PlcValue plcValue = null;
         PlcResponseCode responseCode;
@@ -372,22 +453,20 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
             logger.warn("Failed to parse read response for tag {}: {}", tagName, e.getMessage());
             responseCode = PlcResponseCode.INTERNAL_ERROR;
         }
-        future.complete(new DefaultPlcReadResponse(request,
+        return new DefaultPlcReadResponse(request,
             Collections.singletonMap(tagName,
-                new DefaultPlcResponseItem<>(responseCode, plcValue))));
+                new DefaultPlcResponseItem<>(responseCode, plcValue)));
     }
 
     // ========== Write ==========
 
     @Override
-    public CompletableFuture<PlcWriteResponse> write(PlcWriteRequest writeRequest) {
-        var future = new CompletableFuture<PlcWriteResponse>();
+    protected CompletableFuture<PlcWriteResponse> onWrite(PlcWriteRequest writeRequest) {
         var request = (DefaultPlcWriteRequest) writeRequest;
 
         if (request.getTagNames().size() != 1) {
-            future.completeExceptionally(
+            return CompletableFuture.failedFuture(
                 new PlcRuntimeException("DL/T 645-2007 only supports single tag requests"));
-            return future;
         }
 
         var tagName = request.getTagNames().iterator().next();
@@ -401,8 +480,7 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
         }
 
         // Standard DI tag: write data (0x14)
-        var dlt645Tag = (Dlt645Tag) tag;
-        return executeWriteData(request, tagName, dlt645Tag, value);
+        return executeWriteData(request, tagName, (Dlt645Tag) tag, value);
     }
 
     /**
@@ -411,34 +489,25 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
     private CompletableFuture<PlcWriteResponse> executeWriteData(
         DefaultPlcWriteRequest request, String tagName, Dlt645Tag tag, PlcValue value) {
 
-        var future = new CompletableFuture<PlcWriteResponse>();
         var frame = buildWriteDataFrame(tag.getDataIdentifier(), serializeValue(value));
 
-        var transaction = tm.startRequest();
-        transaction.submit(() -> conversationContext.sendRequest(frame)
-            .expectResponse(Dlt645Frame.class, requestTimeout)
-            .onTimeout(e -> { transaction.endRequest(); future.completeExceptionally(e); })
-            .onError((p, e) -> { transaction.endRequest(); future.completeExceptionally(e); })
-            .handle(response -> {
-                PlcResponseCode responseCode;
-                var controlCode = response.getControl();
-                if (controlCode == ControlCode.WRITE_DATA_ERROR) {
-                    logger.warn("Write error for tag {}: {}",
-                        tagName, StaticHelper.describeError(response.getDataPlain()));
-                    responseCode = PlcResponseCode.REMOTE_ERROR;
-                } else if (controlCode == ControlCode.WRITE_DATA_RESPONSE) {
-                    responseCode = PlcResponseCode.OK;
-                } else {
-                    logger.warn("Unexpected control code in write response: 0x{}",
-                        String.format("%02X", controlCode.getValue()));
-                    responseCode = PlcResponseCode.INTERNAL_ERROR;
-                }
-                future.complete(new DefaultPlcWriteResponse(request,
-                    Collections.singletonMap(tagName, responseCode)));
-                transaction.endRequest();
-            }));
-
-        return future;
+        return sendRequest(frame).thenApply(response -> {
+            PlcResponseCode responseCode;
+            var controlCode = response.getControl();
+            if (controlCode == ControlCode.WRITE_DATA_ERROR) {
+                logger.warn("Write error for tag {}: {}",
+                    tagName, StaticHelper.describeError(response.getDataPlain()));
+                responseCode = PlcResponseCode.REMOTE_ERROR;
+            } else if (controlCode == ControlCode.WRITE_DATA_RESPONSE) {
+                responseCode = PlcResponseCode.OK;
+            } else {
+                logger.warn("Unexpected control code in write response: 0x{}",
+                    String.format("%02X", controlCode.getValue()));
+                responseCode = PlcResponseCode.INTERNAL_ERROR;
+            }
+            return (PlcWriteResponse) new DefaultPlcWriteResponse(request,
+                Collections.singletonMap(tagName, responseCode));
+        });
     }
 
     /**
@@ -477,10 +546,8 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
                     ControlCode.CLEAR_EVENT, ControlCode.CLEAR_EVENT_RESPONSE, ControlCode.CLEAR_EVENT_ERROR,
                     buildAuthOnlyData());
             default:
-                var future = new CompletableFuture<PlcWriteResponse>();
-                future.completeExceptionally(
+                return CompletableFuture.failedFuture(
                     new PlcRuntimeException("Command '" + cmdType.getKeyword() + "' is not a write command"));
-                return future;
         }
     }
 
@@ -491,35 +558,26 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
     private CompletableFuture<PlcWriteResponse> executeWriteAddress(
         DefaultPlcWriteRequest request, String tagName, PlcValue value) {
 
-        var future = new CompletableFuture<PlcWriteResponse>();
         var newAddress = Dlt645DriverContext.parseMeterAddress(value.getString());
         var frame = new Dlt645Frame(BROADCAST_ADDRESS, ControlCode.WRITE_ADDRESS,
             (short) newAddress.length, newAddress);
 
-        var transaction = tm.startRequest();
-        transaction.submit(() -> conversationContext.sendRequest(frame)
-            .expectResponse(Dlt645Frame.class, requestTimeout)
-            .onTimeout(e -> { transaction.endRequest(); future.completeExceptionally(e); })
-            .onError((p, e) -> { transaction.endRequest(); future.completeExceptionally(e); })
-            .handle(response -> {
-                PlcResponseCode responseCode;
-                var controlCode = response.getControl();
-                if (controlCode == ControlCode.WRITE_ADDRESS_ERROR) {
-                    logger.warn("Write address error: {}", StaticHelper.describeError(response.getDataPlain()));
-                    responseCode = PlcResponseCode.REMOTE_ERROR;
-                } else if (controlCode == ControlCode.WRITE_ADDRESS_RESPONSE) {
-                    responseCode = PlcResponseCode.OK;
-                } else {
-                    logger.warn("Unexpected control code for write-address: 0x{}",
-                        String.format("%02X", controlCode.getValue()));
-                    responseCode = PlcResponseCode.INTERNAL_ERROR;
-                }
-                future.complete(new DefaultPlcWriteResponse(request,
-                    Collections.singletonMap(tagName, responseCode)));
-                transaction.endRequest();
-            }));
-
-        return future;
+        return sendRequest(frame).thenApply(response -> {
+            PlcResponseCode responseCode;
+            var controlCode = response.getControl();
+            if (controlCode == ControlCode.WRITE_ADDRESS_ERROR) {
+                logger.warn("Write address error: {}", StaticHelper.describeError(response.getDataPlain()));
+                responseCode = PlcResponseCode.REMOTE_ERROR;
+            } else if (controlCode == ControlCode.WRITE_ADDRESS_RESPONSE) {
+                responseCode = PlcResponseCode.OK;
+            } else {
+                logger.warn("Unexpected control code for write-address: 0x{}",
+                    String.format("%02X", controlCode.getValue()));
+                responseCode = PlcResponseCode.INTERNAL_ERROR;
+            }
+            return (PlcWriteResponse) new DefaultPlcWriteResponse(request,
+                Collections.singletonMap(tagName, responseCode));
+        });
     }
 
     /**
@@ -530,34 +588,25 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
         ControlCode reqCode, ControlCode respCode, ControlCode errCode,
         byte[] dataPlain) {
 
-        var future = new CompletableFuture<PlcWriteResponse>();
         var frame = new Dlt645Frame(meterAddress, reqCode, (short) dataPlain.length, dataPlain);
 
-        var transaction = tm.startRequest();
-        transaction.submit(() -> conversationContext.sendRequest(frame)
-            .expectResponse(Dlt645Frame.class, requestTimeout)
-            .onTimeout(e -> { transaction.endRequest(); future.completeExceptionally(e); })
-            .onError((p, e) -> { transaction.endRequest(); future.completeExceptionally(e); })
-            .handle(response -> {
-                PlcResponseCode responseCode;
-                var controlCode = response.getControl();
-                if (controlCode == errCode) {
-                    logger.warn("Command {} error: {}",
-                        reqCode.name(), StaticHelper.describeError(response.getDataPlain()));
-                    responseCode = PlcResponseCode.REMOTE_ERROR;
-                } else if (controlCode == respCode) {
-                    responseCode = PlcResponseCode.OK;
-                } else {
-                    logger.warn("Unexpected control code for {}: 0x{}",
-                        reqCode.name(), String.format("%02X", controlCode.getValue()));
-                    responseCode = PlcResponseCode.INTERNAL_ERROR;
-                }
-                future.complete(new DefaultPlcWriteResponse(request,
-                    Collections.singletonMap(tagName, responseCode)));
-                transaction.endRequest();
-            }));
-
-        return future;
+        return sendRequest(frame).thenApply(response -> {
+            PlcResponseCode responseCode;
+            var controlCode = response.getControl();
+            if (controlCode == errCode) {
+                logger.warn("Command {} error: {}",
+                    reqCode.name(), StaticHelper.describeError(response.getDataPlain()));
+                responseCode = PlcResponseCode.REMOTE_ERROR;
+            } else if (controlCode == respCode) {
+                responseCode = PlcResponseCode.OK;
+            } else {
+                logger.warn("Unexpected control code for {}: 0x{}",
+                    reqCode.name(), String.format("%02X", controlCode.getValue()));
+                responseCode = PlcResponseCode.INTERNAL_ERROR;
+            }
+            return (PlcWriteResponse) new DefaultPlcWriteResponse(request,
+                Collections.singletonMap(tagName, responseCode));
+        });
     }
 
     // ========== Frame construction ==========
@@ -796,5 +845,59 @@ public class Dlt645ProtocolLogic extends Plc4xProtocolBase<Dlt645Frame>
             bytes[i] = (byte) Integer.parseInt(clean.substring(i * 2, i * 2 + 2), 16);
         }
         return bytes;
+    }
+
+    // ========== Transport send ==========
+
+    /**
+     * Send a frame and wait for its response, chaining so only one transaction
+     * is in flight (DL/T 645 over serial has no transaction id).
+     */
+    private CompletableFuture<Dlt645Frame> sendRequest(Dlt645Frame frame) {
+        CompletableFuture<Dlt645Frame> responseFuture = new CompletableFuture<>();
+        long requestId;
+        synchronized (requestChainLock) {
+            requestId = ++requestIdGenerator;
+        }
+        pendingRequests.put(requestId, responseFuture);
+
+        long timeoutMs = getConfiguration().getRequestTimeout();
+        responseFuture.orTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+            .whenComplete((result, error) -> {
+                if (error instanceof TimeoutException) {
+                    pendingRequests.remove(requestId);
+                }
+            });
+
+        CompletableFuture<?> previous;
+        synchronized (requestChainLock) {
+            previous = requestTail;
+            requestTail = responseFuture.handle((result, error) -> null);
+        }
+        if (previous.isDone()) {
+            dispatchRequest(frame, requestId, responseFuture);
+        } else {
+            previous.whenCompleteAsync((ignored, ignoredError) -> dispatchRequest(frame, requestId, responseFuture));
+        }
+        return responseFuture;
+    }
+
+    private void dispatchRequest(Dlt645Frame frame, long requestId, CompletableFuture<Dlt645Frame> responseFuture) {
+        if (responseFuture.isDone()) {
+            return;
+        }
+        try {
+            if (auditLog.isEnabled()) {
+                auditLog.write(AuditLogEventType.OUTGOING_MESSAGE,
+                    "Sending DL/T 645 frame, control=0x" + String.format("%02X", frame.getControl().getValue()));
+            }
+            messageCodec.send(frame);
+        } catch (MessageCodecException e) {
+            pendingRequests.remove(requestId);
+            responseFuture.completeExceptionally(new PlcRuntimeException("Failed to send request", e));
+        } catch (RuntimeException e) {
+            pendingRequests.remove(requestId);
+            responseFuture.completeExceptionally(e);
+        }
     }
 }
