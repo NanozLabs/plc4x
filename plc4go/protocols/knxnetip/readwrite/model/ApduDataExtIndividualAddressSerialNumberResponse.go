@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -180,7 +180,7 @@ func CastApduDataExtIndividualAddressSerialNumberResponse(structType any) ApduDa
 	return nil
 }
 
-func (m *_ApduDataExtIndividualAddressSerialNumberResponse) GetTypeName() string {
+func (m *_ApduDataExtIndividualAddressSerialNumberResponse) GetPlx4xTypeName() string {
 	return "ApduDataExtIndividualAddressSerialNumberResponse"
 }
 

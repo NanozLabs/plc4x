@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -199,7 +199,7 @@ func CastBACnetVMACEntry(structType any) BACnetVMACEntry {
 	return nil
 }
 
-func (m *_BACnetVMACEntry) GetTypeName() string {
+func (m *_BACnetVMACEntry) GetPlx4xTypeName() string {
 	return "BACnetVMACEntry"
 }
 

@@ -23,18 +23,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.cert.X509Certificate;
 
-import org.apache.plc4x.java.spi.configuration.PlcConnectionConfiguration;
-import org.apache.plc4x.java.opcua.context.SecureChannel;
+import org.apache.plc4x.java.spi.config.Configuration;
 import org.apache.plc4x.java.opcua.security.MessageSecurity;
 import org.apache.plc4x.java.opcua.security.SecurityPolicy;
-import org.apache.plc4x.java.spi.configuration.annotations.ComplexConfigurationParameter;
-import org.apache.plc4x.java.spi.configuration.annotations.ConfigurationParameter;
-import org.apache.plc4x.java.spi.configuration.annotations.Description;
-import org.apache.plc4x.java.spi.configuration.annotations.defaults.BooleanDefaultValue;
-import org.apache.plc4x.java.spi.configuration.annotations.defaults.LongDefaultValue;
-import org.apache.plc4x.java.spi.configuration.annotations.defaults.StringDefaultValue;
+import org.apache.plc4x.java.spi.config.annotations.ComplexConfigurationParameter;
+import org.apache.plc4x.java.spi.config.annotations.ConfigurationParameter;
+import org.apache.plc4x.java.spi.config.annotations.Description;
+import org.apache.plc4x.java.spi.config.annotations.defaults.BooleanDefaultValue;
+import org.apache.plc4x.java.spi.config.annotations.defaults.LongDefaultValue;
+import org.apache.plc4x.java.spi.config.annotations.defaults.StringDefaultValue;
 
-public class OpcuaConfiguration implements PlcConnectionConfiguration {
+public class OpcuaConfiguration implements Configuration {
 
     @ConfigurationParameter("protocol-code")
     private String protocolCode;
@@ -107,6 +106,14 @@ public class OpcuaConfiguration implements PlcConnectionConfiguration {
     @ConfigurationParameter("trust-store-password")
     @Description("Password used to open trust store.")
     private String trustStorePassword;
+
+    @ConfigurationParameter("insecure-certificate-verification")
+    @BooleanDefaultValue(false)
+    @Description("Disables verification of the OPC UA server certificate, trusting any certificate the server presents.\n" +
+        "This is UNSAFE: it leaves the connection open to man-in-the-middle attacks and defeats the integrity/authenticity\n" +
+        "guarantees of a signed secure channel. Only enable it for local testing. In production, establish trust with\n" +
+        "`trust-store-file` (chain validation) or `server-certificate-file` (certificate pinning) instead.")
+    private boolean insecureCertificateVerification;
 
     // the discovered certificate when discovery is enabled
     private X509Certificate serverCertificate;
@@ -199,17 +206,33 @@ public class OpcuaConfiguration implements PlcConnectionConfiguration {
         return trustStorePassword == null ? null : trustStorePassword.toCharArray();
     }
 
+    public boolean isInsecureCertificateVerification() {
+        return insecureCertificateVerification;
+    }
+
+    /**
+     * The filesystem path of a user-supplied server certificate to pin trust to,
+     * or {@code null} if none was configured. Unlike {@link #getServerCertificate()},
+     * this never returns a certificate that was discovered over the (unauthenticated)
+     * discovery channel, so it is safe to use as a trust anchor.
+     */
+    public String getServerCertificateFile() {
+        return serverCertificateFile;
+    }
+
     public Limits getEncodingLimits() {
         return limits;
     }
 
     public X509Certificate getServerCertificate() {
         if (serverCertificate == null && serverCertificateFile != null) {
-            // initialize server certificate from configured file
             try {
                 byte[] certificateBytes = Files.readAllBytes(Path.of(serverCertificateFile));
-                serverCertificate = SecureChannel.getX509Certificate(certificateBytes);
-            } catch (IOException e) {
+                java.security.cert.CertificateFactory factory =
+                    java.security.cert.CertificateFactory.getInstance("X.509");
+                serverCertificate = (X509Certificate) factory.generateCertificate(
+                    new java.io.ByteArrayInputStream(certificateBytes));
+            } catch (IOException | java.security.cert.CertificateException e) {
                 throw new RuntimeException(e);
             }
         }

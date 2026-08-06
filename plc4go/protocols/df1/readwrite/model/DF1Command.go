@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -255,7 +255,7 @@ func CastDF1Command(structType any) DF1Command {
 	return nil
 }
 
-func (m *_DF1Command) GetTypeName() string {
+func (m *_DF1Command) GetPlx4xTypeName() string {
 	return "DF1Command"
 }
 

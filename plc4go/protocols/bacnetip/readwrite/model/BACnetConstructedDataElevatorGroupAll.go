@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -184,7 +184,7 @@ func CastBACnetConstructedDataElevatorGroupAll(structType any) BACnetConstructed
 	return nil
 }
 
-func (m *_BACnetConstructedDataElevatorGroupAll) GetTypeName() string {
+func (m *_BACnetConstructedDataElevatorGroupAll) GetPlx4xTypeName() string {
 	return "BACnetConstructedDataElevatorGroupAll"
 }
 

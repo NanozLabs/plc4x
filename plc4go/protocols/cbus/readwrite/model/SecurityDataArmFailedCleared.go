@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -176,7 +176,7 @@ func CastSecurityDataArmFailedCleared(structType any) SecurityDataArmFailedClear
 	return nil
 }
 
-func (m *_SecurityDataArmFailedCleared) GetTypeName() string {
+func (m *_SecurityDataArmFailedCleared) GetPlx4xTypeName() string {
 	return "SecurityDataArmFailedCleared"
 }
 

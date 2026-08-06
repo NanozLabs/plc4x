@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -222,7 +222,7 @@ func CastKnxGroupAddress2Level(structType any) KnxGroupAddress2Level {
 	return nil
 }
 
-func (m *_KnxGroupAddress2Level) GetTypeName() string {
+func (m *_KnxGroupAddress2Level) GetPlx4xTypeName() string {
 	return "KnxGroupAddress2Level"
 }
 

@@ -25,9 +25,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -181,7 +181,7 @@ func CastDF1SymbolMessageFrameACK(structType any) DF1SymbolMessageFrameACK {
 	return nil
 }
 
-func (m *_DF1SymbolMessageFrameACK) GetTypeName() string {
+func (m *_DF1SymbolMessageFrameACK) GetPlx4xTypeName() string {
 	return "DF1SymbolMessageFrameACK"
 }
 

@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -180,7 +180,7 @@ func CastMPropInfoInd(structType any) MPropInfoInd {
 	return nil
 }
 
-func (m *_MPropInfoInd) GetTypeName() string {
+func (m *_MPropInfoInd) GetPlx4xTypeName() string {
 	return "MPropInfoInd"
 }
 

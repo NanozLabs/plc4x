@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -64,7 +64,7 @@ var _ AdsReadWriteResponse = (*_AdsReadWriteResponse)(nil)
 var _ AmsPacketRequirements = (*_AdsReadWriteResponse)(nil)
 
 // NewAdsReadWriteResponse factory function for _AdsReadWriteResponse
-func NewAdsReadWriteResponse(targetAmsNetId AmsNetId, targetAmsPort uint16, sourceAmsNetId AmsNetId, sourceAmsPort uint16, errorCode uint32, invokeId uint32, result ReturnCode, data []byte) *_AdsReadWriteResponse {
+func NewAdsReadWriteResponse(targetAmsNetId AmsNetId, targetAmsPort uint16, sourceAmsNetId AmsNetId, sourceAmsPort uint16, errorCode ReturnCode, invokeId uint32, result ReturnCode, data []byte) *_AdsReadWriteResponse {
 	_result := &_AdsReadWriteResponse{
 		AmsPacketContract: NewAmsPacket(targetAmsNetId, targetAmsPort, sourceAmsNetId, sourceAmsPort, errorCode, invokeId),
 		Result:            result,
@@ -228,7 +228,7 @@ func CastAdsReadWriteResponse(structType any) AdsReadWriteResponse {
 	return nil
 }
 
-func (m *_AdsReadWriteResponse) GetTypeName() string {
+func (m *_AdsReadWriteResponse) GetPlx4xTypeName() string {
 	return "AdsReadWriteResponse"
 }
 

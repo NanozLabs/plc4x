@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -60,7 +60,7 @@ var _ AdsWriteControlResponse = (*_AdsWriteControlResponse)(nil)
 var _ AmsPacketRequirements = (*_AdsWriteControlResponse)(nil)
 
 // NewAdsWriteControlResponse factory function for _AdsWriteControlResponse
-func NewAdsWriteControlResponse(targetAmsNetId AmsNetId, targetAmsPort uint16, sourceAmsNetId AmsNetId, sourceAmsPort uint16, errorCode uint32, invokeId uint32, result ReturnCode) *_AdsWriteControlResponse {
+func NewAdsWriteControlResponse(targetAmsNetId AmsNetId, targetAmsPort uint16, sourceAmsNetId AmsNetId, sourceAmsPort uint16, errorCode ReturnCode, invokeId uint32, result ReturnCode) *_AdsWriteControlResponse {
 	_result := &_AdsWriteControlResponse{
 		AmsPacketContract: NewAmsPacket(targetAmsNetId, targetAmsPort, sourceAmsNetId, sourceAmsPort, errorCode, invokeId),
 		Result:            result,
@@ -212,7 +212,7 @@ func CastAdsWriteControlResponse(structType any) AdsWriteControlResponse {
 	return nil
 }
 
-func (m *_AdsWriteControlResponse) GetTypeName() string {
+func (m *_AdsWriteControlResponse) GetPlx4xTypeName() string {
 	return "AdsWriteControlResponse"
 }
 

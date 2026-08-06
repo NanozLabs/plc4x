@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -221,7 +221,7 @@ func CastBACnetPropertyStatesFileAccessMethod(structType any) BACnetPropertyStat
 	return nil
 }
 
-func (m *_BACnetPropertyStatesFileAccessMethod) GetTypeName() string {
+func (m *_BACnetPropertyStatesFileAccessMethod) GetPlx4xTypeName() string {
 	return "BACnetPropertyStatesFileAccessMethod"
 }
 

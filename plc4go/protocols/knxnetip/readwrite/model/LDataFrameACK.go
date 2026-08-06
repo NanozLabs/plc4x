@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -184,7 +184,7 @@ func CastLDataFrameACK(structType any) LDataFrameACK {
 	return nil
 }
 
-func (m *_LDataFrameACK) GetTypeName() string {
+func (m *_LDataFrameACK) GetPlx4xTypeName() string {
 	return "LDataFrameACK"
 }
 

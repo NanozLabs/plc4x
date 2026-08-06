@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -279,7 +279,7 @@ func CastBACnetUnconfirmedServiceRequestWhoHas(structType any) BACnetUnconfirmed
 	return nil
 }
 
-func (m *_BACnetUnconfirmedServiceRequestWhoHas) GetTypeName() string {
+func (m *_BACnetUnconfirmedServiceRequestWhoHas) GetPlx4xTypeName() string {
 	return "BACnetUnconfirmedServiceRequestWhoHas"
 }
 

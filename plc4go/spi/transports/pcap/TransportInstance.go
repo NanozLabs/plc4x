@@ -1,3 +1,5 @@
+//go:build cgo || windows
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,9 +35,9 @@ import (
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/gopacket/gopacket/pcap"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/options"
 	"github.com/apache/plc4x/plc4go/spi/transports"
 	transportUtils "github.com/apache/plc4x/plc4go/spi/transports/utils"
@@ -207,4 +209,17 @@ func (m *TransportInstance) SetReadDeadline(deadline time.Time) error {
 
 func (m *TransportInstance) String() string {
 	return fmt.Sprintf("pcap:%s(%s)x%f", m.transportFile, m.portRange, m.speedFactor)
+}
+
+func (m *TransportInstance) ClassifyError(err error) transports.TransportErrorKind {
+	if err == nil {
+		return transports.TransportErrorUnknown
+	}
+	if transports.ErrorIs(err, io.EOF) {
+		return transports.TransportErrorFatal
+	}
+	if transports.ErrorIs(err, context.Canceled) || transports.ErrorIs(err, context.DeadlineExceeded) {
+		return transports.TransportErrorTransient
+	}
+	return transports.TransportErrorFatal
 }

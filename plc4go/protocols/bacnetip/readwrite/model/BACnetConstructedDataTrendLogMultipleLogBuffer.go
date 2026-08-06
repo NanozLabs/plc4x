@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -211,7 +211,7 @@ func CastBACnetConstructedDataTrendLogMultipleLogBuffer(structType any) BACnetCo
 	return nil
 }
 
-func (m *_BACnetConstructedDataTrendLogMultipleLogBuffer) GetTypeName() string {
+func (m *_BACnetConstructedDataTrendLogMultipleLogBuffer) GetPlx4xTypeName() string {
 	return "BACnetConstructedDataTrendLogMultipleLogBuffer"
 }
 

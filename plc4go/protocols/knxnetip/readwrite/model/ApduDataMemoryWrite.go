@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -180,7 +180,7 @@ func CastApduDataMemoryWrite(structType any) ApduDataMemoryWrite {
 	return nil
 }
 
-func (m *_ApduDataMemoryWrite) GetTypeName() string {
+func (m *_ApduDataMemoryWrite) GetPlx4xTypeName() string {
 	return "ApduDataMemoryWrite"
 }
 

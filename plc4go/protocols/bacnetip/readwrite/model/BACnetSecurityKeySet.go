@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -275,7 +275,7 @@ func CastBACnetSecurityKeySet(structType any) BACnetSecurityKeySet {
 	return nil
 }
 
-func (m *_BACnetSecurityKeySet) GetTypeName() string {
+func (m *_BACnetSecurityKeySet) GetPlx4xTypeName() string {
 	return "BACnetSecurityKeySet"
 }
 

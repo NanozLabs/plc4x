@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -227,7 +227,7 @@ func CastComObjectTable(structType any) ComObjectTable {
 	return nil
 }
 
-func (m *_ComObjectTable) GetTypeName() string {
+func (m *_ComObjectTable) GetPlx4xTypeName() string {
 	return "ComObjectTable"
 }
 

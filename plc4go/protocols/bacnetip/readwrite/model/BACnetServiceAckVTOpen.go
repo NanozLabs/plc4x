@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -225,7 +225,7 @@ func CastBACnetServiceAckVTOpen(structType any) BACnetServiceAckVTOpen {
 	return nil
 }
 
-func (m *_BACnetServiceAckVTOpen) GetTypeName() string {
+func (m *_BACnetServiceAckVTOpen) GetPlx4xTypeName() string {
 	return "BACnetServiceAckVTOpen"
 }
 

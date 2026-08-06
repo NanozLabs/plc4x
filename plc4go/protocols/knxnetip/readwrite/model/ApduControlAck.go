@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -180,7 +180,7 @@ func CastApduControlAck(structType any) ApduControlAck {
 	return nil
 }
 
-func (m *_ApduControlAck) GetTypeName() string {
+func (m *_ApduControlAck) GetPlx4xTypeName() string {
 	return "ApduControlAck"
 }
 

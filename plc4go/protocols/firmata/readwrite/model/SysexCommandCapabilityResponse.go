@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -184,7 +184,7 @@ func CastSysexCommandCapabilityResponse(structType any) SysexCommandCapabilityRe
 	return nil
 }
 
-func (m *_SysexCommandCapabilityResponse) GetTypeName() string {
+func (m *_SysexCommandCapabilityResponse) GetPlx4xTypeName() string {
 	return "SysexCommandCapabilityResponse"
 }
 

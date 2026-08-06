@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -180,7 +180,7 @@ func CastMFuncPropCon(structType any) MFuncPropCon {
 	return nil
 }
 
-func (m *_MFuncPropCon) GetTypeName() string {
+func (m *_MFuncPropCon) GetPlx4xTypeName() string {
 	return "MFuncPropCon"
 }
 

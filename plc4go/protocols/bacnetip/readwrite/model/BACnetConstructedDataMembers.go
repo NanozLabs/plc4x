@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -211,7 +211,7 @@ func CastBACnetConstructedDataMembers(structType any) BACnetConstructedDataMembe
 	return nil
 }
 
-func (m *_BACnetConstructedDataMembers) GetTypeName() string {
+func (m *_BACnetConstructedDataMembers) GetPlx4xTypeName() string {
 	return "BACnetConstructedDataMembers"
 }
 

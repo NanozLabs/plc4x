@@ -25,12 +25,12 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/apache/plc4x/plc4go/spi/codegen"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -209,7 +209,7 @@ func CastBVLCResult(structType any) BVLCResult {
 	return nil
 }
 
-func (m *_BVLCResult) GetTypeName() string {
+func (m *_BVLCResult) GetPlx4xTypeName() string {
 	return "BVLCResult"
 }
 
@@ -237,7 +237,7 @@ func (m *_BVLCResult) parse(ctx context.Context, readBuffer utils.ReadBuffer, pa
 	currentPos := positionAware.GetPos()
 	_ = currentPos
 
-	code, err := ReadEnumField[BVLCResultCode](ctx, "code", "BVLCResultCode", ReadEnum(BVLCResultCodeByValue, ReadUnsignedShort(readBuffer, uint8(16))), codegen.WithByteOrder(binary.BigEndian))
+	code, err := ReadEnumField[BVLCResultCode](ctx, "code", "BVLCResultCode", ReadEnum(BVLCResultCodeByValue, ReadUnsignedShort(readBuffer, uint8(16))), codegen.WithEncoding("UTF8"), codegen.WithByteOrder(binary.BigEndian))
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Error parsing 'code' field"))
 	}
@@ -268,7 +268,7 @@ func (m *_BVLCResult) SerializeWithWriteBuffer(ctx context.Context, writeBuffer 
 			return errors.Wrap(pushErr, "Error pushing for BVLCResult")
 		}
 
-		if err := WriteSimpleEnumField[BVLCResultCode](ctx, "code", "BVLCResultCode", m.GetCode(), WriteEnum[BVLCResultCode, uint16](BVLCResultCode.GetValue, BVLCResultCode.PLC4XEnumName, WriteUnsignedShort(writeBuffer, 16)), codegen.WithByteOrder(binary.BigEndian)); err != nil {
+		if err := WriteSimpleEnumField[BVLCResultCode](ctx, "code", "BVLCResultCode", m.GetCode(), WriteEnum[BVLCResultCode, uint16](BVLCResultCode.GetValue, BVLCResultCode.PLC4XEnumName, WriteUnsignedShort(writeBuffer, 16)), codegen.WithEncoding("UTF8"), codegen.WithByteOrder(binary.BigEndian)); err != nil {
 			return errors.Wrap(err, "Error serializing 'code' field")
 		}
 

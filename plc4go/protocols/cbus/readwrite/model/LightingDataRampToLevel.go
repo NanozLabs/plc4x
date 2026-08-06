@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -218,7 +218,7 @@ func CastLightingDataRampToLevel(structType any) LightingDataRampToLevel {
 	return nil
 }
 
-func (m *_LightingDataRampToLevel) GetTypeName() string {
+func (m *_LightingDataRampToLevel) GetPlx4xTypeName() string {
 	return "LightingDataRampToLevel"
 }
 

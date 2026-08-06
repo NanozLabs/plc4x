@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -189,7 +189,7 @@ func CastS7PayloadUserDataItemClkRequest(structType any) S7PayloadUserDataItemCl
 	return nil
 }
 
-func (m *_S7PayloadUserDataItemClkRequest) GetTypeName() string {
+func (m *_S7PayloadUserDataItemClkRequest) GetPlx4xTypeName() string {
 	return "S7PayloadUserDataItemClkRequest"
 }
 

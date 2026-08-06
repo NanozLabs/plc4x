@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -205,7 +205,7 @@ func CastS7ParameterUserDataItem(structType any) S7ParameterUserDataItem {
 	return nil
 }
 
-func (m *_S7ParameterUserDataItem) GetTypeName() string {
+func (m *_S7ParameterUserDataItem) GetPlx4xTypeName() string {
 	return "S7ParameterUserDataItem"
 }
 

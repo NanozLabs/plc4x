@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -179,7 +179,7 @@ func CastHVACHumidity(structType any) HVACHumidity {
 	return nil
 }
 
-func (m *_HVACHumidity) GetTypeName() string {
+func (m *_HVACHumidity) GetPlx4xTypeName() string {
 	return "HVACHumidity"
 }
 

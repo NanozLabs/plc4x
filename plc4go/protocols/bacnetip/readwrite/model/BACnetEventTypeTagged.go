@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -224,7 +224,7 @@ func CastBACnetEventTypeTagged(structType any) BACnetEventTypeTagged {
 	return nil
 }
 
-func (m *_BACnetEventTypeTagged) GetTypeName() string {
+func (m *_BACnetEventTypeTagged) GetPlx4xTypeName() string {
 	return "BACnetEventTypeTagged"
 }
 

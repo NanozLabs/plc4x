@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -231,7 +231,7 @@ func CastBACnetReadAccessProperty(structType any) BACnetReadAccessProperty {
 	return nil
 }
 
-func (m *_BACnetReadAccessProperty) GetTypeName() string {
+func (m *_BACnetReadAccessProperty) GetPlx4xTypeName() string {
 	return "BACnetReadAccessProperty"
 }
 

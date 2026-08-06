@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -180,7 +180,7 @@ func CastTransmitQosDataType(structType any) TransmitQosDataType {
 	return nil
 }
 
-func (m *_TransmitQosDataType) GetTypeName() string {
+func (m *_TransmitQosDataType) GetPlx4xTypeName() string {
 	return "TransmitQosDataType"
 }
 

@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -184,7 +184,7 @@ func CastBACnetConstructedDataLoopAll(structType any) BACnetConstructedDataLoopA
 	return nil
 }
 
-func (m *_BACnetConstructedDataLoopAll) GetTypeName() string {
+func (m *_BACnetConstructedDataLoopAll) GetPlx4xTypeName() string {
 	return "BACnetConstructedDataLoopAll"
 }
 

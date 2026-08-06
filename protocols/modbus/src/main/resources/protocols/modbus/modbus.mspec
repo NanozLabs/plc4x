@@ -22,7 +22,9 @@
 // Remark: The different fields are encoded in Big-endian.
 
 [constants
-    [const          uint 16     modbusTcpDefaultPort 502]
+    [const          uint 16     modbusUdpDefaultPort    502]
+    [const          uint 16     modbusTcpDefaultPort    502]
+    [const          uint 16     modbusTcpTlsDefaultPort 802]
 ]
 
 [enum DriverType
@@ -31,7 +33,7 @@
     ['0x03' MODBUS_ASCII]
 ]
 
-[discriminatedType ModbusADU(DriverType driverType, bit response) byteOrder='BIG_ENDIAN'
+[discriminatedType ModbusADU(DriverType driverType, bit response) byteOrder='"BIG_ENDIAN"' unsignedIntegerEncoding='"unsigned-binary"' signedIntegerEncoding='"twos-complement"' floatEncoding='"IEEE754"' stringEncoding='"UTF8"'
     [typeSwitch driverType
         ['MODBUS_TCP' ModbusTcpADU
             // It is used for transaction pairing, the MODBUS server copies in the response the transaction
@@ -77,7 +79,7 @@
     [discriminator bit         errorFlag]
     [discriminator uint 7      functionFlag]
     [typeSwitch errorFlag,functionFlag,response
-        ['true'                     ModbusPDUError
+        ['true'                     ModbusPDUError(response,functionFlag)
             [simple ModbusErrorCode  exceptionCode]
         ]
 
@@ -273,6 +275,10 @@
     ]
 ]
 
+[discriminatedType ModbusPDUError(bit response, uint 7 functionFlag)
+    [simple ModbusErrorCode  exceptionCode]
+]
+
 [type ModbusPDUReadFileRecordRequestItem
     [simple     uint 8     referenceType]
     [simple     uint 16    fileNumber   ]
@@ -283,7 +289,7 @@
 [type ModbusPDUReadFileRecordResponseItem
     [implicit   uint 8     dataLength     'COUNT(data) + 1'       ]
     [simple     uint 8     referenceType                          ]
-    [array      byte       data           length  'dataLength - 1']
+    [array      byte       data           count   'dataLength - 1']
 ]
 
 [type ModbusPDUWriteFileRecordRequestItem
@@ -291,7 +297,7 @@
     [simple     uint 16    fileNumber]
     [simple     uint 16    recordNumber]
     [implicit   uint 16    recordLength   'COUNT(recordData) / 2'   ]
-    [array      byte       recordData     length  'recordLength * 2']
+    [array      byte       recordData     count   'recordLength * 2']
 ]
 
 [type ModbusPDUWriteFileRecordResponseItem
@@ -299,7 +305,7 @@
     [simple     uint 16    fileNumber]
     [simple     uint 16    recordNumber]
     [implicit   uint 16    recordLength   'COUNT(recordData) / 2']
-    [array      byte       recordData     length  'recordLength']
+    [array      byte       recordData     count    'recordLength']
 ]
 
 [type ModbusDeviceInformationObject
@@ -308,7 +314,7 @@
     [array    byte   data          count         'objectLength']
 ]
 
-[dataIo DataItem(ModbusDataType dataType, uint 16 numberOfValues, bit bigEndian)
+[dataIo DataItem(ModbusDataType dataType, uint 16 numberOfValues, bit bigEndian) unsignedIntegerEncoding='"unsigned-binary"' signedIntegerEncoding='"twos-complement"' floatEncoding='"IEEE754"' stringEncoding='"UTF8"'
     [typeSwitch dataType,numberOfValues,bigEndian
         ['BOOL','1','true'  BOOL
             // TODO: Possibly change the order of the bit and the reserved part.
@@ -416,16 +422,16 @@
             [array float 64 value count 'numberOfValues']
         ]
         ['CHAR','1' CHAR
-            [simple string 8 value encoding='"UTF-8"']
+            [simple string 8 value stringEncoding='"UTF8"']
         ]
         ['CHAR' List
-            [array string 8 value count 'numberOfValues' encoding='"UTF-8"']
+            [array string 8 value count 'numberOfValues' stringEncoding='"UTF8"']
         ]
         ['WCHAR','1' WCHAR
-            [simple string 16 value encoding='"UTF-16"']
+            [simple string 16 value stringEncoding='"UTF16BE"']
         ]
         ['WCHAR' List
-            [array string 16 value count 'numberOfValues' encoding='"UTF-16"']
+            [array string 16 value count 'numberOfValues' stringEncoding='"UTF16BE"']
         ]
     ]
 ]

@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -176,7 +176,7 @@ func CastTriggerControlDataIndicatorKill(structType any) TriggerControlDataIndic
 	return nil
 }
 
-func (m *_TriggerControlDataIndicatorKill) GetTypeName() string {
+func (m *_TriggerControlDataIndicatorKill) GetPlx4xTypeName() string {
 	return "TriggerControlDataIndicatorKill"
 }
 

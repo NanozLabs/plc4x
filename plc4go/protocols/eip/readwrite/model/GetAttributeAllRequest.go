@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -266,7 +266,7 @@ func CastGetAttributeAllRequest(structType any) GetAttributeAllRequest {
 	return nil
 }
 
-func (m *_GetAttributeAllRequest) GetTypeName() string {
+func (m *_GetAttributeAllRequest) GetPlx4xTypeName() string {
 	return "GetAttributeAllRequest"
 }
 

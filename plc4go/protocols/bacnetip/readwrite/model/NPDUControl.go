@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -220,7 +220,7 @@ func CastNPDUControl(structType any) NPDUControl {
 	return nil
 }
 
-func (m *_NPDUControl) GetTypeName() string {
+func (m *_NPDUControl) GetPlx4xTypeName() string {
 	return "NPDUControl"
 }
 

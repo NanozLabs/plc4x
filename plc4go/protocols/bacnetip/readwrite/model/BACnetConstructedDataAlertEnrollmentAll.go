@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -184,7 +184,7 @@ func CastBACnetConstructedDataAlertEnrollmentAll(structType any) BACnetConstruct
 	return nil
 }
 
-func (m *_BACnetConstructedDataAlertEnrollmentAll) GetTypeName() string {
+func (m *_BACnetConstructedDataAlertEnrollmentAll) GetPlx4xTypeName() string {
 	return "BACnetConstructedDataAlertEnrollmentAll"
 }
 

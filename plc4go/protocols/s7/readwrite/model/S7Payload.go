@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -241,7 +241,7 @@ func CastS7Payload(structType any) S7Payload {
 	return nil
 }
 
-func (m *_S7Payload) GetTypeName() string {
+func (m *_S7Payload) GetPlx4xTypeName() string {
 	return "S7Payload"
 }
 

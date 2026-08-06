@@ -25,9 +25,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -181,7 +181,7 @@ func CastBVLCReadBroadcastDistributionTable(structType any) BVLCReadBroadcastDis
 	return nil
 }
 
-func (m *_BVLCReadBroadcastDistributionTable) GetTypeName() string {
+func (m *_BVLCReadBroadcastDistributionTable) GetPlx4xTypeName() string {
 	return "BVLCReadBroadcastDistributionTable"
 }
 

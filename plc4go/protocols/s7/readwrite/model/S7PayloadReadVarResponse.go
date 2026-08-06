@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -211,7 +211,7 @@ func CastS7PayloadReadVarResponse(structType any) S7PayloadReadVarResponse {
 	return nil
 }
 
-func (m *_S7PayloadReadVarResponse) GetTypeName() string {
+func (m *_S7PayloadReadVarResponse) GetPlx4xTypeName() string {
 	return "S7PayloadReadVarResponse"
 }
 

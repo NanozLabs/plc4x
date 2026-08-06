@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -176,7 +176,7 @@ func CastAccessControlDataAccessPointLeftOpen(structType any) AccessControlDataA
 	return nil
 }
 
-func (m *_AccessControlDataAccessPointLeftOpen) GetTypeName() string {
+func (m *_AccessControlDataAccessPointLeftOpen) GetPlx4xTypeName() string {
 	return "AccessControlDataAccessPointLeftOpen"
 }
 

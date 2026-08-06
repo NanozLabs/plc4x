@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -246,7 +246,7 @@ func CastBACnetConstructedDataUTCOffset(structType any) BACnetConstructedDataUTC
 	return nil
 }
 
-func (m *_BACnetConstructedDataUTCOffset) GetTypeName() string {
+func (m *_BACnetConstructedDataUTCOffset) GetPlx4xTypeName() string {
 	return "BACnetConstructedDataUTCOffset"
 }
 

@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -243,7 +243,7 @@ func CastBACnetLightingCommandEnclosed(structType any) BACnetLightingCommandEncl
 	return nil
 }
 
-func (m *_BACnetLightingCommandEnclosed) GetTypeName() string {
+func (m *_BACnetLightingCommandEnclosed) GetPlx4xTypeName() string {
 	return "BACnetLightingCommandEnclosed"
 }
 

@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -354,7 +354,7 @@ func CastBACnetWeekNDayTagged(structType any) BACnetWeekNDayTagged {
 	return nil
 }
 
-func (m *_BACnetWeekNDayTagged) GetTypeName() string {
+func (m *_BACnetWeekNDayTagged) GetPlx4xTypeName() string {
 	return "BACnetWeekNDayTagged"
 }
 

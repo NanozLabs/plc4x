@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -255,7 +255,7 @@ func CastApdu(structType any) Apdu {
 	return nil
 }
 
-func (m *_Apdu) GetTypeName() string {
+func (m *_Apdu) GetPlx4xTypeName() string {
 	return "Apdu"
 }
 

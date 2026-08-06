@@ -25,12 +25,12 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/apache/plc4x/plc4go/spi/codegen"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -248,7 +248,7 @@ func CastDF1Symbol(structType any) DF1Symbol {
 	return nil
 }
 
-func (m *_DF1Symbol) GetTypeName() string {
+func (m *_DF1Symbol) GetPlx4xTypeName() string {
 	return "DF1Symbol"
 }
 

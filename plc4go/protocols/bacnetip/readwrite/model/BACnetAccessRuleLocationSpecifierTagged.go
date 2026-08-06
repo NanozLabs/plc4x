@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -193,7 +193,7 @@ func CastBACnetAccessRuleLocationSpecifierTagged(structType any) BACnetAccessRul
 	return nil
 }
 
-func (m *_BACnetAccessRuleLocationSpecifierTagged) GetTypeName() string {
+func (m *_BACnetAccessRuleLocationSpecifierTagged) GetPlx4xTypeName() string {
 	return "BACnetAccessRuleLocationSpecifierTagged"
 }
 

@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -224,7 +224,7 @@ func CastBACnetLifeSafetyStateTagged(structType any) BACnetLifeSafetyStateTagged
 	return nil
 }
 
-func (m *_BACnetLifeSafetyStateTagged) GetTypeName() string {
+func (m *_BACnetLifeSafetyStateTagged) GetPlx4xTypeName() string {
 	return "BACnetLifeSafetyStateTagged"
 }
 

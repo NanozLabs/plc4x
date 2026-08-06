@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -176,7 +176,7 @@ func CastSecurityDataPanicActivated(structType any) SecurityDataPanicActivated {
 	return nil
 }
 
-func (m *_SecurityDataPanicActivated) GetTypeName() string {
+func (m *_SecurityDataPanicActivated) GetPlx4xTypeName() string {
 	return "SecurityDataPanicActivated"
 }
 

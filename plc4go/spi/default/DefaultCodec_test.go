@@ -27,12 +27,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/apache/plc4x/plc4go/spi"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/options"
 	"github.com/apache/plc4x/plc4go/spi/testutils"
 	"github.com/apache/plc4x/plc4go/spi/transports"
@@ -423,10 +423,61 @@ func Test_defaultCodec_Connect(t *testing.T) {
 				customMessageHandling:         tt.fields.customMessageHandling,
 				log:                           testutils.ProduceTestingLogger(t),
 			}
+			// Connect starts the expire/receive workers, which select on m.ctx and
+			// log through m.log on panic — so ctx must be non-nil and the workers
+			// (tracked by activeWorker, not wg) must be joined before the test ends.
+			m.ctx, m.ctxCancel = context.WithCancel(t.Context())
+			t.Cleanup(func() {
+				m.running.Store(false)
+				m.ctxCancel()
+				m.activeWorker.Wait()
+				m.wg.Wait()
+			})
 			tt.wantErr(t, m.Connect(tt.args.ctx), fmt.Sprintf("Connect(%v)", tt.args.ctx))
-			m.running.Store(false)
-			m.wg.Wait()
 		})
+	}
+}
+
+// Test_defaultCodec_Connect_workersAliveAfterConnect is a falsification test
+// for the worker-startup race: Connect used to start the workers BEFORE
+// running.Store(true), so a worker observing running==false in both its loop
+// condition and its restart defer terminated permanently — leaving a
+// successfully "connected" codec whose expectations never expire and whose
+// messages are never received (observed as an infinite hang in the cbus
+// Reader tests). An idle worker blocks in its select receiving from its
+// (unbuffered) notify channel, so a blocking send succeeds iff the worker is
+// alive.
+func Test_defaultCodec_Connect_workersAliveAfterConnect(t *testing.T) {
+	for i := 0; i < 1000; i++ {
+		requirements := NewMockDefaultCodecRequirements(t)
+		requirements.EXPECT().Receive(mock.Anything).Return(nil, nil).Maybe()
+		instance := NewMockTransportInstance(t)
+		instance.EXPECT().IsConnected().Return(true)
+		instance.EXPECT().Close().Return(nil)
+		// A receive cycle in flight during Disconnect classifies the synthetic
+		// "not running" error before the worker notices the shutdown.
+		instance.EXPECT().ClassifyError(mock.Anything).Return(transports.TransportErrorTransient).Maybe()
+		codec := buildDefaultCodec(requirements, instance, options.WithCustomLogger(testutils.ProduceTestingLogger(t))).(*defaultCodec)
+		require.NoError(t, codec.Connect(testutils.TestContext(t)))
+		t.Cleanup(func() {
+			if codec.IsRunning() {
+				_ = codec.Disconnect()
+			}
+		})
+		for _, probe := range []struct {
+			worker string
+			notify chan struct{}
+		}{
+			{"expire", codec.notifyExpireWorker},
+			{"receive", codec.notifyReceiveWorker},
+		} {
+			select {
+			case probe.notify <- struct{}{}:
+			case <-time.After(5 * time.Second):
+				t.Fatalf("iteration %d: %s worker died during Connect", i, probe.worker)
+			}
+		}
+		require.NoError(t, codec.Disconnect())
 	}
 }
 

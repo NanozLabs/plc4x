@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -136,7 +136,7 @@ func CastGroupObjectDescriptorRealisationType6(structType any) GroupObjectDescri
 	return nil
 }
 
-func (m *_GroupObjectDescriptorRealisationType6) GetTypeName() string {
+func (m *_GroupObjectDescriptorRealisationType6) GetPlx4xTypeName() string {
 	return "GroupObjectDescriptorRealisationType6"
 }
 

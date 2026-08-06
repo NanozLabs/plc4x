@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -181,7 +181,7 @@ func CastApduDataAdcResponse(structType any) ApduDataAdcResponse {
 	return nil
 }
 
-func (m *_ApduDataAdcResponse) GetTypeName() string {
+func (m *_ApduDataAdcResponse) GetPlx4xTypeName() string {
 	return "ApduDataAdcResponse"
 }
 

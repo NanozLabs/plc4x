@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -386,7 +386,7 @@ func CastBACnetEventParameterOutOfRange(structType any) BACnetEventParameterOutO
 	return nil
 }
 
-func (m *_BACnetEventParameterOutOfRange) GetTypeName() string {
+func (m *_BACnetEventParameterOutOfRange) GetPlx4xTypeName() string {
 	return "BACnetEventParameterOutOfRange"
 }
 

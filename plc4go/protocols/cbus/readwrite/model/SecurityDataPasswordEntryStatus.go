@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -252,7 +252,7 @@ func CastSecurityDataPasswordEntryStatus(structType any) SecurityDataPasswordEnt
 	return nil
 }
 
-func (m *_SecurityDataPasswordEntryStatus) GetTypeName() string {
+func (m *_SecurityDataPasswordEntryStatus) GetPlx4xTypeName() string {
 	return "SecurityDataPasswordEntryStatus"
 }
 

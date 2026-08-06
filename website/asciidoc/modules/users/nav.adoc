@@ -54,8 +54,8 @@
 *** xref:protocols/plc4x.adoc[]
 *** xref:protocols/profinet.adoc[]
 *** xref:protocols/s7.adoc[]
-*** xref:protocols/s7-light.adoc[]
 *** xref:protocols/simulated.adoc[]
+*** xref:protocols/slmp.adoc[]
 *** xref:protocols/umas.adoc[]
 
 ** xref:transports/index.adoc[]
@@ -80,6 +80,7 @@
 *** xref:tools/capture-replay.adoc[]
 *** xref:tools/connection-cache.adoc[]
 *** xref:tools/opm.adoc[]
+*** xref:tools/plc4x-server.adoc[]
 *** xref:tools/scraper.adoc[]
 *** xref:tools/testing.adoc[]
 

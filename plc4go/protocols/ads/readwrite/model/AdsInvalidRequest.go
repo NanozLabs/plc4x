@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -54,7 +54,7 @@ var _ AdsInvalidRequest = (*_AdsInvalidRequest)(nil)
 var _ AmsPacketRequirements = (*_AdsInvalidRequest)(nil)
 
 // NewAdsInvalidRequest factory function for _AdsInvalidRequest
-func NewAdsInvalidRequest(targetAmsNetId AmsNetId, targetAmsPort uint16, sourceAmsNetId AmsNetId, sourceAmsPort uint16, errorCode uint32, invokeId uint32) *_AdsInvalidRequest {
+func NewAdsInvalidRequest(targetAmsNetId AmsNetId, targetAmsPort uint16, sourceAmsNetId AmsNetId, sourceAmsPort uint16, errorCode ReturnCode, invokeId uint32) *_AdsInvalidRequest {
 	_result := &_AdsInvalidRequest{
 		AmsPacketContract: NewAmsPacket(targetAmsNetId, targetAmsPort, sourceAmsNetId, sourceAmsPort, errorCode, invokeId),
 	}
@@ -184,7 +184,7 @@ func CastAdsInvalidRequest(structType any) AdsInvalidRequest {
 	return nil
 }
 
-func (m *_AdsInvalidRequest) GetTypeName() string {
+func (m *_AdsInvalidRequest) GetPlx4xTypeName() string {
 	return "AdsInvalidRequest"
 }
 

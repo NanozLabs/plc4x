@@ -30,11 +30,11 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	"github.com/subchen/go-xmldom"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/options"
+	"github.com/apache/plc4x/plc4go/spi/testutils/xmldom"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -271,9 +271,9 @@ func ParseParserSerializerTestSuite(t *testing.T, node xmldom.Node, parser Parse
 		switch child.Name {
 		case "name":
 			testsuiteName = child.Text
-		case "protocolName":
+		case "protocol-name":
 			protocolName = child.Text
-		case "outputFlavor":
+		case "output-flavor":
 			outputFlavor = child.Text
 		case "driver-parameters":
 			parameterList := child.FindByName("parameter")

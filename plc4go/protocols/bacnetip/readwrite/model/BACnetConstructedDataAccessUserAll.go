@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -184,7 +184,7 @@ func CastBACnetConstructedDataAccessUserAll(structType any) BACnetConstructedDat
 	return nil
 }
 
-func (m *_BACnetConstructedDataAccessUserAll) GetTypeName() string {
+func (m *_BACnetConstructedDataAccessUserAll) GetPlx4xTypeName() string {
 	return "BACnetConstructedDataAccessUserAll"
 }
 

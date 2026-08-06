@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -176,7 +176,7 @@ func CastTelephonyDataLineOnHook(structType any) TelephonyDataLineOnHook {
 	return nil
 }
 
-func (m *_TelephonyDataLineOnHook) GetTypeName() string {
+func (m *_TelephonyDataLineOnHook) GetPlx4xTypeName() string {
 	return "TelephonyDataLineOnHook"
 }
 

@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -228,7 +228,7 @@ func CastMediaTransportControlDataNextPreviousSelection(structType any) MediaTra
 	return nil
 }
 
-func (m *_MediaTransportControlDataNextPreviousSelection) GetTypeName() string {
+func (m *_MediaTransportControlDataNextPreviousSelection) GetPlx4xTypeName() string {
 	return "MediaTransportControlDataNextPreviousSelection"
 }
 

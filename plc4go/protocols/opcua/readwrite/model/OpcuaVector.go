@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -180,7 +180,7 @@ func CastOpcuaVector(structType any) OpcuaVector {
 	return nil
 }
 
-func (m *_OpcuaVector) GetTypeName() string {
+func (m *_OpcuaVector) GetPlx4xTypeName() string {
 	return "OpcuaVector"
 }
 

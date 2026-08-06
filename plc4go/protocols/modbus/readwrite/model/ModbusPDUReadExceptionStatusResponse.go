@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -215,7 +215,7 @@ func CastModbusPDUReadExceptionStatusResponse(structType any) ModbusPDUReadExcep
 	return nil
 }
 
-func (m *_ModbusPDUReadExceptionStatusResponse) GetTypeName() string {
+func (m *_ModbusPDUReadExceptionStatusResponse) GetPlx4xTypeName() string {
 	return "ModbusPDUReadExceptionStatusResponse"
 }
 

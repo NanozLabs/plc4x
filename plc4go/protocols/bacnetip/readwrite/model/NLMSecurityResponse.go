@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -253,7 +253,7 @@ func CastNLMSecurityResponse(structType any) NLMSecurityResponse {
 	return nil
 }
 
-func (m *_NLMSecurityResponse) GetTypeName() string {
+func (m *_NLMSecurityResponse) GetPlx4xTypeName() string {
 	return "NLMSecurityResponse"
 }
 

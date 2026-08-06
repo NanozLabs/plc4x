@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -221,7 +221,7 @@ func CastBACnetOptionalREALNull(structType any) BACnetOptionalREALNull {
 	return nil
 }
 
-func (m *_BACnetOptionalREALNull) GetTypeName() string {
+func (m *_BACnetOptionalREALNull) GetPlx4xTypeName() string {
 	return "BACnetOptionalREALNull"
 }
 

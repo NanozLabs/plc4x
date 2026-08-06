@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -188,7 +188,7 @@ func CastNullCommandResponse(structType any) NullCommandResponse {
 	return nil
 }
 
-func (m *_NullCommandResponse) GetTypeName() string {
+func (m *_NullCommandResponse) GetPlx4xTypeName() string {
 	return "NullCommandResponse"
 }
 

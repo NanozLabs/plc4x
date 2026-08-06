@@ -25,9 +25,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -181,7 +181,7 @@ func CastCIPEncapsulationConnectionResponse(structType any) CIPEncapsulationConn
 	return nil
 }
 
-func (m *_CIPEncapsulationConnectionResponse) GetTypeName() string {
+func (m *_CIPEncapsulationConnectionResponse) GetPlx4xTypeName() string {
 	return "CIPEncapsulationConnectionResponse"
 }
 

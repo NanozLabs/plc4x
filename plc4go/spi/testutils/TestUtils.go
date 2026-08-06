@@ -35,13 +35,12 @@ import (
 	"github.com/ajankovic/xdiff"
 	"github.com/ajankovic/xdiff/parser"
 	"github.com/fatih/color"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/rs/zerolog/pkgerrors"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/apache/plc4x/plc4go/pkg/api/logging"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/options"
 	"github.com/apache/plc4x/plc4go/spi/pool"
 	"github.com/apache/plc4x/plc4go/spi/transactions"
@@ -170,25 +169,38 @@ func getOrLeaveDuration(key string, setting *time.Duration) {
 	}
 }
 
+// shouldNoColor's result only depends on the environment, but it WRITES the
+// global color.NoColor - and it is called from ProduceTestingLogger for every
+// (potentially parallel) test, which the race detector flags as concurrent
+// unsynchronized writes. Compute it exactly once.
+var (
+	noColorOnce   sync.Once
+	noColorResult bool
+)
+
 func shouldNoColor() bool {
-	if _, forceColorEnv := os.LookupEnv("FORCE_COLOR"); forceColorEnv {
-		color.NoColor = false // Apparently the color.NoColor is a bit to eager
-		return false
-	}
-	noColor := false
-	{
-		_, noColorEnv := os.LookupEnv("NO_COLOR")
-		onJenkins := os.Getenv("JENKINS_URL") != ""
-		onGithubAction := os.Getenv("GITHUB_ACTIONS") != ""
-		onCI := os.Getenv("CI") != ""
-		if noColorEnv || onJenkins || onGithubAction || onCI {
-			noColor = true
+	noColorOnce.Do(func() {
+		if _, forceColorEnv := os.LookupEnv("FORCE_COLOR"); forceColorEnv {
+			color.NoColor = false // Apparently the color.NoColor is a bit to eager
+			noColorResult = false
+			return
 		}
-	}
-	if !noColor {
-		color.NoColor = false // Apparently the color.NoColor is a bit to eager
-	}
-	return noColor
+		noColor := false
+		{
+			_, noColorEnv := os.LookupEnv("NO_COLOR")
+			onJenkins := os.Getenv("JENKINS_URL") != ""
+			onGithubAction := os.Getenv("GITHUB_ACTIONS") != ""
+			onCI := os.Getenv("CI") != ""
+			if noColorEnv || onJenkins || onGithubAction || onCI {
+				noColor = true
+			}
+		}
+		if !noColor {
+			color.NoColor = false // Apparently the color.NoColor is a bit to eager
+		}
+		noColorResult = noColor
+	})
+	return noColorResult
 }
 
 type TestingLog interface {
@@ -295,15 +307,15 @@ func ProduceTestingLogger(t TestingLog) zerolog.Logger {
 				return nil
 			}
 			var r strings.Builder
-			stack := pkgerrors.MarshalStack(err)
+			stack := errors.MarshalStack(err)
 			if stack == nil {
 				return nil
 			}
 			stackMap := stack.([]map[string]string)
 			for _, entry := range stackMap {
-				stackSourceFileName := entry[pkgerrors.StackSourceFileName]
-				stackSourceLineName := entry[pkgerrors.StackSourceLineName]
-				stackSourceFunctionName := entry[pkgerrors.StackSourceFunctionName]
+				stackSourceFileName := entry[errors.StackSourceFileName]
+				stackSourceLineName := entry[errors.StackSourceLineName]
+				stackSourceFunctionName := entry[errors.StackSourceFunctionName]
 				r.WriteString(fmt.Sprintf("\tat %v (%v:%v)\n", stackSourceFunctionName, stackSourceFileName, stackSourceLineName))
 			}
 			return r.String()

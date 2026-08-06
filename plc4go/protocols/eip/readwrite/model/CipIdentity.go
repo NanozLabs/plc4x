@@ -25,12 +25,12 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/apache/plc4x/plc4go/spi/codegen"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -410,7 +410,7 @@ func CastCipIdentity(structType any) CipIdentity {
 	return nil
 }
 
-func (m *_CipIdentity) GetTypeName() string {
+func (m *_CipIdentity) GetPlx4xTypeName() string {
 	return "CipIdentity"
 }
 

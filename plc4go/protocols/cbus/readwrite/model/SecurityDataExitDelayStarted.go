@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -176,7 +176,7 @@ func CastSecurityDataExitDelayStarted(structType any) SecurityDataExitDelayStart
 	return nil
 }
 
-func (m *_SecurityDataExitDelayStarted) GetTypeName() string {
+func (m *_SecurityDataExitDelayStarted) GetPlx4xTypeName() string {
 	return "SecurityDataExitDelayStarted"
 }
 

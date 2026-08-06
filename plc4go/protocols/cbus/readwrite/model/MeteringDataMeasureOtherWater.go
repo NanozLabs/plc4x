@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -176,7 +176,7 @@ func CastMeteringDataMeasureOtherWater(structType any) MeteringDataMeasureOtherW
 	return nil
 }
 
-func (m *_MeteringDataMeasureOtherWater) GetTypeName() string {
+func (m *_MeteringDataMeasureOtherWater) GetPlx4xTypeName() string {
 	return "MeteringDataMeasureOtherWater"
 }
 

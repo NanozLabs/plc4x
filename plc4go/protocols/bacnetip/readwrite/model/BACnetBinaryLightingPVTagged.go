@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -224,7 +224,7 @@ func CastBACnetBinaryLightingPVTagged(structType any) BACnetBinaryLightingPVTagg
 	return nil
 }
 
-func (m *_BACnetBinaryLightingPVTagged) GetTypeName() string {
+func (m *_BACnetBinaryLightingPVTagged) GetPlx4xTypeName() string {
 	return "BACnetBinaryLightingPVTagged"
 }
 

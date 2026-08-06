@@ -28,11 +28,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/apache/plc4x/plc4go/pkg/api/config"
 	"github.com/apache/plc4x/plc4go/spi"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/options"
 	"github.com/apache/plc4x/plc4go/spi/transports"
 	"github.com/apache/plc4x/plc4go/spi/utils"
@@ -50,6 +50,7 @@ type DefaultCodec interface {
 	utils.Serializable
 	spi.MessageCodec
 	spi.TransportInstanceExposer
+	spi.TransportErrorHandlerSetter
 }
 
 // NewDefaultCodec is the factory for a DefaultCodec
@@ -100,6 +101,8 @@ type defaultCodec struct {
 	wg sync.WaitGroup // use to track spawned go routines
 
 	log zerolog.Logger
+
+	transportErrorHandler transports.TransportErrorHandler
 }
 
 func buildDefaultCodec(defaultCodecRequirements DefaultCodecRequirements, transportInstance transports.TransportInstance, _options ...options.WithOption) DefaultCodec {
@@ -144,6 +147,10 @@ func (m *defaultCodec) GetTransportInstance() transports.TransportInstance {
 	return m.transportInstance
 }
 
+func (m *defaultCodec) SetTransportErrorHandler(handler transports.TransportErrorHandler) {
+	m.transportErrorHandler = handler
+}
+
 func (m *defaultCodec) GetDefaultIncomingMessageChannel() chan spi.Message {
 	return m.defaultIncomingMessageChannel
 }
@@ -164,13 +171,26 @@ func (m *defaultCodec) Connect(ctx context.Context) error {
 	}
 
 	m.log.Debug().Msg("Message codec currently not running, starting worker now")
-	m.startWorkers()
+	// running must be true BEFORE the workers start: a worker that observes
+	// running==false in its loop condition AND in its restart defer terminates
+	// permanently, leaving a "connected" codec whose expectations never expire.
+	// The goroutine-creation happens-before edge guarantees the workers see true.
 	m.running.Store(true)
+	m.startWorkers()
 	m.log.Trace().Msg("connected")
 	return nil
 }
 
 func (m *defaultCodec) Disconnect() error {
+	// Lock-free fast path. A transport-error handler dispatched via
+	// emitTransportError runs on m.wg and may call back into Disconnect (through
+	// connection.Invalidate -> Close) while another Disconnect already holds
+	// stateChange and is blocked in m.wg.Wait(). The error paths store
+	// running=false before emitting, so this check lets the re-entrant call
+	// return before it contends on stateChange, breaking that deadlock cycle.
+	if !m.running.Load() {
+		return errors.New("already disconnected")
+	}
 	m.stateChange.Lock()
 	defer m.stateChange.Unlock()
 	if !m.running.Load() {
@@ -207,6 +227,12 @@ func (m *defaultCodec) IsRunning() bool {
 }
 
 func (m *defaultCodec) Expect(ctx context.Context, interactionInfo string, acceptsMessage spi.AcceptsMessage, handleMessage spi.HandleMessage, handleError spi.HandleError) {
+	m.expect(ctx, interactionInfo, acceptsMessage, handleMessage, handleError)
+}
+
+// expect is the implementation of Expect which additionally hands back the
+// registered expectation so internal callers can remove it again.
+func (m *defaultCodec) expect(ctx context.Context, interactionInfo string, acceptsMessage spi.AcceptsMessage, handleMessage spi.HandleMessage, handleError spi.HandleError) spi.Expectation {
 	m.expectationsChangeMutex.Lock()
 	defer m.expectationsChangeMutex.Unlock()
 	ttl := m.receiveTimeout
@@ -224,15 +250,30 @@ func (m *defaultCodec) Expect(ctx context.Context, interactionInfo string, accep
 	case m.notifyReceiveWorker <- struct{}{}:
 	default:
 	}
+	return expectation
+}
+
+func (m *defaultCodec) removeExpectation(expectation spi.Expectation) {
+	m.expectationsChangeMutex.Lock()
+	defer m.expectationsChangeMutex.Unlock()
+	m.expectations = slices.DeleteFunc(m.expectations, func(candidate spi.Expectation) bool {
+		return candidate == expectation
+	})
 }
 
 func (m *defaultCodec) SendRequest(ctx context.Context, interactionInfo string, message spi.Message, acceptsMessage spi.AcceptsMessage, handleMessage spi.HandleMessage, handleError spi.HandleError) error {
 	if err := ctx.Err(); err != nil {
 		return errors.Wrap(err, "Not sending message as context is aborted")
 	}
-	m.Expect(ctx, interactionInfo, acceptsMessage, handleMessage, handleError) // We register the expectation first to avoid getting a response between sending and adding the expect
+	expectation := m.expect(ctx, interactionInfo, acceptsMessage, handleMessage, handleError) // We register the expectation first to avoid getting a response between sending and adding the expect
 	m.log.Trace().Str("interactionInfo", interactionInfo).Msg("Sending request")
-	return m.Send(ctx, interactionInfo, message)
+	if err := m.Send(ctx, interactionInfo, message); err != nil {
+		// The caller receives the send error directly; leaving the expectation
+		// registered would fire the error handler a second time on timeout.
+		m.removeExpectation(expectation)
+		return err
+	}
+	return nil
 }
 
 func (m *defaultCodec) TimeoutExpectations(now time.Time) time.Duration {
@@ -366,6 +407,9 @@ mainLoop:
 			select {
 			case <-m.notifyExpireWorker:
 				workerLog.Trace().Msg("waking up because of notification")
+			case <-m.ctx.Done():
+				workerLog.Trace().Msg("context done, exiting expire work")
+				return
 			case <-timer.C:
 				workerLog.Trace().Msg("waking up for next expire")
 			}
@@ -476,7 +520,11 @@ mainLoop:
 		}
 		if err != nil {
 			workerLog.Error().Err(err).Msg("got an error reading from transport")
-			continue mainLoop
+			if m.handleTransportError(workerLog, err) {
+				continue mainLoop
+			}
+			workerLog.Debug().Msg("transport error requested worker shutdown")
+			return
 		}
 		if message == nil {
 			workerLog.Trace().Msg("Not enough data yet")
@@ -513,5 +561,127 @@ func (m *defaultCodec) passToDefaultIncomingMessageChannel(workerLog zerolog.Log
 	case m.defaultIncomingMessageChannel <- message:
 	default:
 		workerLog.Warn().Interface("message", message).Msg("Message discarded")
+	}
+}
+
+func (m *defaultCodec) handleTransportError(workerLog zerolog.Logger, err error) bool {
+	if err == nil {
+		return true
+	}
+	// Defuse improperly constructed error chains (e.g. a typed-nil *net.OpError
+	// wrapped via %w) once at the entry point: everything below - classification,
+	// wrapping, expectation fan-out, logging - walks the chain repeatedly, and
+	// unguarded walks dereference such values, which killed the receive worker
+	// with a recovered nil-pointer panic in the field. A corrupt chain is
+	// flattened and tagged with errors.ErrCorruptErrorChain so the anomaly
+	// stays visible downstream instead of being silently swallowed.
+	err = errors.SanitizeError(err)
+	if transports.ErrorIs(err, context.Canceled) {
+		workerLog.Debug().Msg("receive aborted due to context cancellation")
+		return false
+	}
+
+	kind := transports.TransportErrorUnknown
+	if transports.ErrorIs(err, context.DeadlineExceeded) {
+		kind = transports.TransportErrorRetryable
+	} else if m.transportInstance != nil {
+		kind = m.transportInstance.ClassifyError(err)
+	}
+	if kind == transports.TransportErrorUnknown {
+		workerLog.Warn().Err(err).Msg("transport error classified as unknown; treating as fatal")
+		kind = transports.TransportErrorFatal
+	}
+
+	switch kind {
+	case transports.TransportErrorTransient:
+		workerLog.Debug().Err(err).Msg("transient transport error; keeping worker alive")
+		m.emitTransportError(kind, transports.NewTransportError(kind, err))
+		return true
+	case transports.TransportErrorRetryable:
+		workerLog.Warn().Err(err).Msg("retryable transport error; resetting transport instance")
+		if m.transportInstance != nil {
+			defer func() {
+				if recoverErr := recover(); recoverErr != nil {
+					workerLog.Error().Interface("panic", recoverErr).Msg("panic while resetting transport instance")
+				}
+			}()
+			m.transportInstance.Reset()
+		}
+		m.emitTransportError(kind, transports.NewTransportError(kind, err))
+		return true
+	case transports.TransportErrorFatal:
+		workerLog.Error().Err(err).Msg("fatal transport error; shutting down codec")
+		wrappedErr := transports.NewTransportError(kind, err)
+		m.failAllExpectations(wrappedErr)
+		if m.transportInstance != nil {
+			if closeErr := m.transportInstance.Close(); closeErr != nil {
+				workerLog.Warn().Err(closeErr).Msg("error closing transport after fatal condition")
+			}
+		}
+		if m.ctxCancel != nil {
+			m.ctxCancel()
+		}
+		m.running.Store(false)
+		m.emitTransportError(kind, wrappedErr)
+		return false
+	default:
+		workerLog.Error().Err(err).Msg("unexpected transport error classification; treating as fatal")
+		wrappedErr := transports.NewTransportError(transports.TransportErrorFatal, err)
+		m.failAllExpectations(wrappedErr)
+		if m.transportInstance != nil {
+			if closeErr := m.transportInstance.Close(); closeErr != nil {
+				workerLog.Warn().Err(closeErr).Msg("error closing transport after unexpected classification")
+			}
+		}
+		if m.ctxCancel != nil {
+			m.ctxCancel()
+		}
+		m.running.Store(false)
+		m.emitTransportError(transports.TransportErrorFatal, wrappedErr)
+		return false
+	}
+}
+
+func (m *defaultCodec) emitTransportError(kind transports.TransportErrorKind, err error) {
+	handler := m.transportErrorHandler
+	if handler == nil {
+		return
+	}
+	// The handler is external code (typically the owning connection) that may
+	// react to a fatal error by invalidating and closing the connection, which
+	// calls back into Disconnect(). Disconnect() blocks on activeWorker.Wait()
+	// until the receive/expire workers have exited and contends on stateChange.
+	// emitTransportError is invoked *from* the receive worker, so calling the
+	// handler inline would make that worker wait for itself - or deadlock
+	// against a concurrent Disconnect() that already holds stateChange and is
+	// waiting for this worker to exit. Dispatch it on a goroutine so the worker
+	// can return and exit. The re-entrant Disconnect() is safe here because its
+	// lock-free fast path returns before contending on stateChange/m.wg once
+	// shutdown has been signalled (running == false).
+	m.wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				m.log.Error().Interface("panic", r).Msg("recovered from panic in transport error handler")
+			}
+		}()
+		handler(kind, err)
+	})
+}
+
+func (m *defaultCodec) failAllExpectations(err error) {
+	m.expectationsChangeMutex.Lock()
+	expectations := slices.Clone(m.expectations)
+	m.expectations = nil
+	m.expectationsChangeMutex.Unlock()
+
+	for _, expectation := range expectations {
+		expectation.Cancel(err)
+		if handleErr := expectation.GetHandleError(); handleErr != nil {
+			m.wg.Go(func() {
+				if handlerErr := handleErr(err); handlerErr != nil {
+					m.log.Error().Err(handlerErr).Msg("error returned by expectation error handler")
+				}
+			})
+		}
 	}
 }

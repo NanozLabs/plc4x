@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -176,7 +176,7 @@ func CastTelephonyDataInternetConnectionRequestMade(structType any) TelephonyDat
 	return nil
 }
 
-func (m *_TelephonyDataInternetConnectionRequestMade) GetTypeName() string {
+func (m *_TelephonyDataInternetConnectionRequestMade) GetPlx4xTypeName() string {
 	return "TelephonyDataInternetConnectionRequestMade"
 }
 

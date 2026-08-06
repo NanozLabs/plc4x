@@ -26,12 +26,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	apiModel "github.com/apache/plc4x/plc4go/pkg/api/model"
 	apiValues "github.com/apache/plc4x/plc4go/pkg/api/values"
 	driverModel "github.com/apache/plc4x/plc4go/protocols/knxnetip/readwrite/model"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	spiModel "github.com/apache/plc4x/plc4go/spi/model"
 	"github.com/apache/plc4x/plc4go/spi/options"
 	"github.com/apache/plc4x/plc4go/spi/utils"
@@ -60,7 +60,7 @@ func (m *Reader) Read(ctx context.Context, readRequest apiModel.PlcReadRequest) 
 	m.wg.Go(func() {
 		defer func() {
 			if err := recover(); err != nil {
-				resultChan <- spiModel.NewDefaultPlcReadRequestResult(readRequest, nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack()))
+				utils.DeliverResult(m.log, resultChan, spiModel.NewDefaultPlcReadRequestResult(readRequest, nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack())))
 			}
 		}()
 		responseCodes := map[string]apiModel.PlcResponseCode{}
@@ -161,11 +161,11 @@ func (m *Reader) Read(ctx context.Context, readRequest apiModel.PlcReadRequest) 
 
 		// Assemble the results
 		result := spiModel.NewDefaultPlcReadResponse(readRequest, responseCodes, plcValues)
-		resultChan <- spiModel.NewDefaultPlcReadRequestResult(
+		utils.DeliverResult(m.log, resultChan, spiModel.NewDefaultPlcReadRequestResult(
 			readRequest,
 			result,
 			nil,
-		)
+		))
 	})
 	return resultChan
 }

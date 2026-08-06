@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -189,7 +189,7 @@ func CastTransportType(structType any) TransportType {
 	return nil
 }
 
-func (m *_TransportType) GetTypeName() string {
+func (m *_TransportType) GetPlx4xTypeName() string {
 	return "TransportType"
 }
 

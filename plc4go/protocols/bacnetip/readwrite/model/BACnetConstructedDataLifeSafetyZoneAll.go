@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -184,7 +184,7 @@ func CastBACnetConstructedDataLifeSafetyZoneAll(structType any) BACnetConstructe
 	return nil
 }
 
-func (m *_BACnetConstructedDataLifeSafetyZoneAll) GetTypeName() string {
+func (m *_BACnetConstructedDataLifeSafetyZoneAll) GetPlx4xTypeName() string {
 	return "BACnetConstructedDataLifeSafetyZoneAll"
 }
 

@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -188,7 +188,7 @@ func CastS7PayloadUserDataItemCyclicServicesUnsubscribeResponse(structType any) 
 	return nil
 }
 
-func (m *_S7PayloadUserDataItemCyclicServicesUnsubscribeResponse) GetTypeName() string {
+func (m *_S7PayloadUserDataItemCyclicServicesUnsubscribeResponse) GetPlx4xTypeName() string {
 	return "S7PayloadUserDataItemCyclicServicesUnsubscribeResponse"
 }
 

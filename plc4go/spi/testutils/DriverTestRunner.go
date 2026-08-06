@@ -31,16 +31,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	"github.com/subchen/go-xmldom"
 
 	"github.com/apache/plc4x/plc4go/pkg/api"
 	"github.com/apache/plc4x/plc4go/pkg/api/config"
 	apiModel "github.com/apache/plc4x/plc4go/pkg/api/model"
 	"github.com/apache/plc4x/plc4go/spi"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/options"
 	"github.com/apache/plc4x/plc4go/spi/options/converter"
+	"github.com/apache/plc4x/plc4go/spi/testutils/xmldom"
 	"github.com/apache/plc4x/plc4go/spi/transports"
 	"github.com/apache/plc4x/plc4go/spi/transports/test"
 	"github.com/apache/plc4x/plc4go/spi/utils"
@@ -621,9 +621,9 @@ func ParseDriverTestsuite(t *testing.T, node xmldom.Node, parser XmlParser, root
 		switch child.Name {
 		case "name":
 			testsuiteName = child.Text
-		case "protocolName":
+		case "protocol-name":
 			protocolName = child.Text
-		case "outputFlavor":
+		case "output-flavor":
 			outputFlavor = child.Text
 		case "driver-name":
 			driverName = child.Text

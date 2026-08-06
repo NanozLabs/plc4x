@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -203,7 +203,7 @@ func CastSecurityDataZoneUnsealed(structType any) SecurityDataZoneUnsealed {
 	return nil
 }
 
-func (m *_SecurityDataZoneUnsealed) GetTypeName() string {
+func (m *_SecurityDataZoneUnsealed) GetPlx4xTypeName() string {
 	return "SecurityDataZoneUnsealed"
 }
 

@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -180,7 +180,7 @@ func CastTDataIndividualInd(structType any) TDataIndividualInd {
 	return nil
 }
 
-func (m *_TDataIndividualInd) GetTypeName() string {
+func (m *_TDataIndividualInd) GetPlx4xTypeName() string {
 	return "TDataIndividualInd"
 }
 

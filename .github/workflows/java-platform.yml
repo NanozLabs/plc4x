@@ -60,7 +60,7 @@ jobs:
         run: brew install libpcap
 
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Java
         uses: actions/setup-java@v5
@@ -70,7 +70,7 @@ jobs:
           java-version: ${{ matrix.java }}
 
       - name: Cache local Maven repository
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -79,7 +79,7 @@ jobs:
 
       - name: Set Platform options
         id: platform_opts
-        uses: actions/github-script@v8.0.0
+        uses: actions/github-script@v9.0.0
         env:
           OS: ${{ matrix.os }}
         with:
@@ -97,7 +97,7 @@ jobs:
 
       - name: Calculate platform suffix
         id: platform_suffix
-        uses: actions/github-script@v8.0.0
+        uses: actions/github-script@v9.0.0
         env:
           OS: ${{ matrix.os }}
         with:
@@ -111,7 +111,7 @@ jobs:
 
       - name: Set extra options
         id: extra_options
-        uses: actions/github-script@v8.0.0
+        uses: actions/github-script@v9.0.0
         env:
           FORCE_UPDATE: ${{ github.event.inputs.forceUpdates }}
         with:

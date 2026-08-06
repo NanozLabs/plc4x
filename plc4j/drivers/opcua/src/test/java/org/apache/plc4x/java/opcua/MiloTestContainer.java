@@ -40,7 +40,11 @@ public class MiloTestContainer extends GenericContainer<MiloTestContainer> {
             // Uncomment below to debug Milo server
             //.withStartupTimeout(Duration.ofMinutes(10))
         ;
-        addExposedPort(12686);
+        // Fixed 12686 -> 12686 mapping. The Milo server advertises its endpoints on
+        // localhost:12686 (its internal bind port), so the host port MUST equal 12686 —
+        // otherwise the client connects to a random mapped port, is redirected to the
+        // (unreachable) advertised localhost:12686 endpoint, and the handshake hangs.
+        addFixedExposedPort(12686, 12686);
 
         // Uncomment below to enable server debug
         //withEnv("JAVA_TOOL_OPTIONS", "-agentlib:jdwp=transport=dt_socket,address=*:8000,server=y,suspend=y");
@@ -50,8 +54,10 @@ public class MiloTestContainer extends GenericContainer<MiloTestContainer> {
     private static ImageFromDockerfile inlineImage() {
         Path absolutePath = Paths.get(".").toAbsolutePath();
         logger.info("Building milo server image from {}", absolutePath);
+        // Reuse the Docker layer cache across runs; the build context only changes when
+        // the milo jar or the compiled TestMiloServer classes change, so a cached build
+        // stays correct while turning a multi-minute rebuild into a near-instant one.
         return new ImageFromDockerfile("plc4x-milo-test", false)
-            .withBuildImageCmdModifier(cmd -> cmd.withNoCache(true))
             .withDockerfile(absolutePath.resolve("Dockerfile.test"));
     }
 

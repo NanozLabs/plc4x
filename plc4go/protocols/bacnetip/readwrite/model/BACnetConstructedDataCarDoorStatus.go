@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -258,7 +258,7 @@ func CastBACnetConstructedDataCarDoorStatus(structType any) BACnetConstructedDat
 	return nil
 }
 
-func (m *_BACnetConstructedDataCarDoorStatus) GetTypeName() string {
+func (m *_BACnetConstructedDataCarDoorStatus) GetPlx4xTypeName() string {
 	return "BACnetConstructedDataCarDoorStatus"
 }
 

@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -314,7 +314,7 @@ func CastBACnetConfirmedServiceRequestAddListElement(structType any) BACnetConfi
 	return nil
 }
 
-func (m *_BACnetConfirmedServiceRequestAddListElement) GetTypeName() string {
+func (m *_BACnetConfirmedServiceRequestAddListElement) GetPlx4xTypeName() string {
 	return "BACnetConfirmedServiceRequestAddListElement"
 }
 

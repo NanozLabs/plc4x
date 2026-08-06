@@ -24,10 +24,10 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -206,7 +206,7 @@ func CastBACnetAbortReasonTagged(structType any) BACnetAbortReasonTagged {
 	return nil
 }
 
-func (m *_BACnetAbortReasonTagged) GetTypeName() string {
+func (m *_BACnetAbortReasonTagged) GetPlx4xTypeName() string {
 	return "BACnetAbortReasonTagged"
 }
 

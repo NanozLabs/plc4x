@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -221,7 +221,7 @@ func CastBACnetPriorityValueDouble(structType any) BACnetPriorityValueDouble {
 	return nil
 }
 
-func (m *_BACnetPriorityValueDouble) GetTypeName() string {
+func (m *_BACnetPriorityValueDouble) GetPlx4xTypeName() string {
 	return "BACnetPriorityValueDouble"
 }
 

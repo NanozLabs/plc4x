@@ -25,12 +25,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	apiModel "github.com/apache/plc4x/plc4go/pkg/api/model"
 	"github.com/apache/plc4x/plc4go/pkg/api/values"
 	driverModel "github.com/apache/plc4x/plc4go/protocols/knxnetip/readwrite/model"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	spiModel "github.com/apache/plc4x/plc4go/spi/model"
 	"github.com/apache/plc4x/plc4go/spi/options"
 	"github.com/apache/plc4x/plc4go/spi/utils"
@@ -67,7 +67,7 @@ func (s *Subscriber) Subscribe(ctx context.Context, subscriptionRequest apiModel
 	s.wg.Go(func() {
 		defer func() {
 			if err := recover(); err != nil {
-				result <- spiModel.NewDefaultPlcSubscriptionRequestResult(subscriptionRequest, nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack()))
+				utils.DeliverResult(s.log, result, spiModel.NewDefaultPlcSubscriptionRequestResult(subscriptionRequest, nil, errors.Errorf("panic-ed %v. Stack: %s", err, debug.Stack())))
 			}
 		}()
 		internalPlcSubscriptionRequest := subscriptionRequest.(*spiModel.DefaultPlcSubscriptionRequest)
@@ -84,7 +84,7 @@ func (s *Subscriber) Subscribe(ctx context.Context, subscriptionRequest apiModel
 			subscriptionValues[tagName] = NewSubscriptionHandle(s, tagName, internalPlcSubscriptionRequest.GetTag(tagName), tagType, internalPlcSubscriptionRequest.GetInterval(tagName))
 		}
 
-		result <- spiModel.NewDefaultPlcSubscriptionRequestResult(
+		utils.DeliverResult(s.log, result, spiModel.NewDefaultPlcSubscriptionRequestResult(
 			subscriptionRequest,
 			spiModel.NewDefaultPlcSubscriptionResponse(
 				subscriptionRequest,
@@ -93,7 +93,7 @@ func (s *Subscriber) Subscribe(ctx context.Context, subscriptionRequest apiModel
 				append(s._options, options.WithCustomLogger(s.log))...,
 			),
 			nil,
-		)
+		))
 	})
 	return result
 }
@@ -101,7 +101,7 @@ func (s *Subscriber) Subscribe(ctx context.Context, subscriptionRequest apiModel
 func (s *Subscriber) Unsubscribe(ctx context.Context, unsubscriptionRequest apiModel.PlcUnsubscriptionRequest) <-chan apiModel.PlcUnsubscriptionRequestResult {
 	// TODO: handle context
 	result := make(chan apiModel.PlcUnsubscriptionRequestResult, 1)
-	result <- spiModel.NewDefaultPlcUnsubscriptionRequestResult(unsubscriptionRequest, nil, errors.New("Not Implemented"))
+	utils.DeliverResult(s.log, result, spiModel.NewDefaultPlcUnsubscriptionRequestResult(unsubscriptionRequest, nil, errors.New("Not Implemented")))
 	// TODO: As soon as we establish a connection, we start getting data...
 	// subscriptions are more an internal handling of which values to pass where.
 

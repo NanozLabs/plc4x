@@ -25,11 +25,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/pool"
 )
 
@@ -324,8 +324,8 @@ func Test_requestTransaction_AwaitCompletion(t1 *testing.T) {
 				wg.Go(func() {
 					time.Sleep(100 * time.Millisecond)
 					r := transaction.parent
-					r.workLogMutex.RLock()
-					defer r.workLogMutex.RUnlock()
+					r.runningRequestMutex.Lock()
+					defer r.runningRequestMutex.Unlock()
 					r.runningRequests = append(r.runningRequests, &requestTransaction{transactionId: 1})
 				})
 			},

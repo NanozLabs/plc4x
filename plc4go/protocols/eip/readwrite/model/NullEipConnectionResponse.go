@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -188,7 +188,7 @@ func CastNullEipConnectionResponse(structType any) NullEipConnectionResponse {
 	return nil
 }
 
-func (m *_NullEipConnectionResponse) GetTypeName() string {
+func (m *_NullEipConnectionResponse) GetPlx4xTypeName() string {
 	return "NullEipConnectionResponse"
 }
 

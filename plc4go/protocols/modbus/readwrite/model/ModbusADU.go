@@ -25,9 +25,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -228,7 +228,7 @@ func CastModbusADU(structType any) ModbusADU {
 	return nil
 }
 
-func (m *_ModbusADU) GetTypeName() string {
+func (m *_ModbusADU) GetPlx4xTypeName() string {
 	return "ModbusADU"
 }
 

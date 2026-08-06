@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -184,7 +184,7 @@ func CastBACnetConstructedDataOptional(structType any) BACnetConstructedDataOpti
 	return nil
 }
 
-func (m *_BACnetConstructedDataOptional) GetTypeName() string {
+func (m *_BACnetConstructedDataOptional) GetPlx4xTypeName() string {
 	return "BACnetConstructedDataOptional"
 }
 

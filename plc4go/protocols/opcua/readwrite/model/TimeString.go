@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -135,7 +135,7 @@ func CastTimeString(structType any) TimeString {
 	return nil
 }
 
-func (m *_TimeString) GetTypeName() string {
+func (m *_TimeString) GetPlx4xTypeName() string {
 	return "TimeString"
 }
 

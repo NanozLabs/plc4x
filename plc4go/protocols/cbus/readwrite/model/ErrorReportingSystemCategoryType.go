@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -263,7 +263,7 @@ func CastErrorReportingSystemCategoryType(structType any) ErrorReportingSystemCa
 	return nil
 }
 
-func (m *_ErrorReportingSystemCategoryType) GetTypeName() string {
+func (m *_ErrorReportingSystemCategoryType) GetPlx4xTypeName() string {
 	return "ErrorReportingSystemCategoryType"
 }
 

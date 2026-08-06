@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -448,7 +448,7 @@ func CastBACnetNotificationParametersChangeOfDiscreteValueNewValue(structType an
 	return nil
 }
 
-func (m *_BACnetNotificationParametersChangeOfDiscreteValueNewValue) GetTypeName() string {
+func (m *_BACnetNotificationParametersChangeOfDiscreteValueNewValue) GetPlx4xTypeName() string {
 	return "BACnetNotificationParametersChangeOfDiscreteValueNewValue"
 }
 

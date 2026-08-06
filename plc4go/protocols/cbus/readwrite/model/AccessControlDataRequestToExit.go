@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -176,7 +176,7 @@ func CastAccessControlDataRequestToExit(structType any) AccessControlDataRequest
 	return nil
 }
 
-func (m *_AccessControlDataRequestToExit) GetTypeName() string {
+func (m *_AccessControlDataRequestToExit) GetPlx4xTypeName() string {
 	return "AccessControlDataRequestToExit"
 }
 

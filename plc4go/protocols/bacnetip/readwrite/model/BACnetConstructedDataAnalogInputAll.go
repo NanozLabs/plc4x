@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -184,7 +184,7 @@ func CastBACnetConstructedDataAnalogInputAll(structType any) BACnetConstructedDa
 	return nil
 }
 
-func (m *_BACnetConstructedDataAnalogInputAll) GetTypeName() string {
+func (m *_BACnetConstructedDataAnalogInputAll) GetPlx4xTypeName() string {
 	return "BACnetConstructedDataAnalogInputAll"
 }
 

@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -180,7 +180,7 @@ func CastConnectionRequestInformationDeviceManagement(structType any) Connection
 	return nil
 }
 
-func (m *_ConnectionRequestInformationDeviceManagement) GetTypeName() string {
+func (m *_ConnectionRequestInformationDeviceManagement) GetPlx4xTypeName() string {
 	return "ConnectionRequestInformationDeviceManagement"
 }
 

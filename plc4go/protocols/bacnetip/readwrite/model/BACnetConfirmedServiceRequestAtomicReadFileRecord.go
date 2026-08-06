@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -254,7 +254,7 @@ func CastBACnetConfirmedServiceRequestAtomicReadFileRecord(structType any) BACne
 	return nil
 }
 
-func (m *_BACnetConfirmedServiceRequestAtomicReadFileRecord) GetTypeName() string {
+func (m *_BACnetConfirmedServiceRequestAtomicReadFileRecord) GetPlx4xTypeName() string {
 	return "BACnetConfirmedServiceRequestAtomicReadFileRecord"
 }
 

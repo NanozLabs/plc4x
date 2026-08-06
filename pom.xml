@@ -17,20 +17,18 @@
   specific language governing permissions and limitations
   under the License.
   -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-
-  <modelVersion>4.0.0</modelVersion>
+<project xmlns="http://maven.apache.org/POM/4.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.1.0 http://maven.apache.org/xsd/maven-4.1.0.xsd">
 
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
-    <version>37</version>
+    <version>39</version>
     <relativePath />
   </parent>
 
   <groupId>org.apache.plc4x</groupId>
   <artifactId>plc4x-parent</artifactId>
-  <version>0.14.0-nanoz-SNAPSHOT</version>
+  <version>1.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>PLC4X</name>
@@ -93,14 +91,13 @@
 
     <!-- Timestamp for the reproducible builds -->
     <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ss'Z'</maven.build.timestamp.format>
-    <project.build.outputTimestamp>2025-08-02T13:55:11Z</project.build.outputTimestamp>
+    <project.build.outputTimestamp>2026-07-14T21:58:01Z</project.build.outputTimestamp>
 
     <!-- Exclude all generated code -->
     <sonar.exclusions>**/generated-sources</sonar.exclusions>
-    <sonar.cfamily.build-wrapper-output>${project.basedir}/plc4c/target/build-wrapper-output
-    </sonar.cfamily.build-wrapper-output>
+    <sonar.cfamily.build-wrapper-output>${project.basedir}/plc4c/target/build-wrapper-output</sonar.cfamily.build-wrapper-output>
 
-    <plc4x-code-generation.version>1.9.0-SNAPSHOT</plc4x-code-generation.version>
+    <plc4x-code-generation.version>1.9.0</plc4x-code-generation.version>
 
     <antlr.version>4.13.2</antlr.version>
     <apiguardian.version>1.1.2</apiguardian.version>
@@ -108,16 +105,16 @@
     <awaitility.version>4.3.0</awaitility.version>
     <!-- The currently available version is 2.0.5 and anything above 1.4.3 is no longer compatible with our code -->
     <bit-io.version>1.4.3</bit-io.version>
-    <bouncycastle.version>1.84</bouncycastle.version>
-    <byte-buddy.version>1.18.8</byte-buddy.version>
+    <bouncycastle.version>1.85</bouncycastle.version>
+    <byte-buddy.version>1.18.11</byte-buddy.version>
     <cmake.version>3.31.5-b1</cmake.version>
     <commons-beanutils.version>1.9.4</commons-beanutils.version>
     <commons-cli.version>1.11.0</commons-cli.version>
-    <commons-codec.version>1.21.0</commons-codec.version>
+    <commons-codec.version>1.22.1</commons-codec.version>
     <commons-collections4.version>4.5.0</commons-collections4.version>
     <commons-compress.version>1.28.0</commons-compress.version>
-    <commons-configuration2.version>2.14.0</commons-configuration2.version>
-    <commons-io.version>2.21.0</commons-io.version>
+    <commons-configuration2.version>2.15.1</commons-configuration2.version>
+    <commons-io.version>2.22.0</commons-io.version>
     <commons-lang3.version>3.20.0</commons-lang3.version>
     <commons-logging.version>1.3.5</commons-logging.version>
     <commons-math3.version>3.6.1</commons-math3.version>
@@ -125,33 +122,33 @@
     <commons-text.version>1.15.0</commons-text.version>
     <commons-csv.version>1.14.1</commons-csv.version>
     <dom4j.version>2.2.0</dom4j.version>
-    <equalsverifier.version>4.4.2</equalsverifier.version>
+    <equalsverifier.version>4.5</equalsverifier.version>
     <freemarker.version>2.3.34</freemarker.version>
-    <groovy.version>5.0.5</groovy.version>
+    <groovy.version>5.0.7</groovy.version>
     <guava.version>33.6.0-jre</guava.version>
     <hamcrest.version>3.0</hamcrest.version>
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <jackson.version>2.21.2</jackson.version>
-    <jackson.broken.version>2.21</jackson.broken.version>
+    <jackson.version>2.21.4</jackson.version>
+    <jackson.broken.version>2.22</jackson.broken.version>
     <woodstox-core.version>7.1.1</woodstox-core.version>
     <!-- When updating this to the latest version, we're getting errors in the opcua server tests -->
     <jaxb.version>4.0.4</jaxb.version>
     <jetty-util.version>12.1.0</jetty-util.version>
-    <jna.version>5.18.1</jna.version>
+    <jna.version>5.19.1</jna.version>
     <jserialcom.version>2.11.4</jserialcom.version>
-    <junit.jupiter.version>6.0.3</junit.jupiter.version>
+    <junit.jupiter.version>6.1.2</junit.jupiter.version>
     <junit.platform.version>1.8.2</junit.platform.version>
-    <logback.version>1.5.32</logback.version>
+    <logback.version>1.6.1</logback.version>
     <maven.clean.plugin.version>3.2.0</maven.clean.plugin.version>
     <milo.version>0.6.16</milo.version>
     <mockito.version>5.23.0</mockito.version>
     <!-- Netty 4.2.x seems to break the serial transports -->
     <netty.version>4.1.123.Final</netty.version>
     <pcap4j.version>1.8.2</pcap4j.version>
-    <slf4j.version>2.0.17</slf4j.version>
+    <slf4j.version>2.0.18</slf4j.version>
     <vavr.version>1.0.1</vavr.version>
-    <xmlunit.version>2.11.0</xmlunit.version>
+    <xmlunit.version>2.12.0</xmlunit.version>
 
     <!-- Site properties -->
     <asciidoctor.maven.plugin.version>2.2.6</asciidoctor.maven.plugin.version>
@@ -170,12 +167,12 @@
     <reflow.skin.version>2.3.3</reflow.skin.version>
   </properties>
 
-  <modules>
-    <module>code-generation</module>
+  <subprojects>
+    <subproject>code-generation</subproject>
     <!-- Definition of the protocol message formats -->
-    <module>protocols</module>
-    <module>website</module>
-  </modules>
+    <subproject>protocols</subproject>
+    <subproject>website</subproject>
+  </subprojects>
 
   <dependencyManagement>
     <dependencies>
@@ -204,11 +201,6 @@
         <groupId>org.freemarker</groupId>
         <artifactId>freemarker</artifactId>
         <version>${freemarker.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.osgi</groupId>
-        <artifactId>osgi.core</artifactId>
-        <version>8.0.0</version>
       </dependency>
 
       <dependency>
@@ -278,7 +270,7 @@
       <dependency>
         <groupId>com.google.googlejavaformat</groupId>
         <artifactId>google-java-format</artifactId>
-        <version>1.35.0</version>
+        <version>1.36.0</version>
       </dependency>
 
       <dependency>
@@ -444,6 +436,16 @@
         <artifactId>bcprov-jdk18on</artifactId>
         <version>${bouncycastle.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcutil-jdk18on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bctls-jdk18on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>org.eclipse.milo</groupId>
@@ -483,6 +485,18 @@
         <version>${mockito.version}</version>
       </dependency>
 
+      <!-- OSGi Dependencies -->
+      <dependency>
+        <groupId>org.osgi</groupId>
+        <artifactId>osgi.core</artifactId>
+        <version>8.0.0</version>
+      </dependency>
+      <dependency>
+        <groupId>org.osgi</groupId>
+        <artifactId>org.osgi.service.component.annotations</artifactId>
+        <version>1.5.1</version>
+      </dependency>
+
       <!-- TODO: Eliminate the usage of AssertJ (OPM and OPC-UA Driver) -->
       <dependency>
         <groupId>org.assertj</groupId>
@@ -520,7 +534,7 @@
       <dependency>
         <groupId>org.json</groupId>
         <artifactId>json</artifactId>
-        <version>20251224</version>
+        <version>20260719</version>
       </dependency>
 
       <dependency>
@@ -621,7 +635,7 @@
           <dependency>
             <groupId>joda-time</groupId>
             <artifactId>joda-time</artifactId>
-            <version>2.14.1</version>
+            <version>2.14.3</version>
           </dependency>
           <dependency>
             <groupId>org.apache.groovy</groupId>
@@ -770,6 +784,7 @@
 
             <!-- Exclude files generated by the go build system -->
             <inputExclude>**/go.sum</inputExclude>
+            <inputExclude>**/tools.sum</inputExclude>
 
             <!-- Exclude Node related files -->
             <inputExclude>ui/frontend/project/dist/**</inputExclude>
@@ -783,6 +798,11 @@
             <!-- Exclude core dumps-->
             <inputExclude>**/hs_err_pid*</inputExclude>
             <inputExclude>**/replay_pid*</inputExclude>
+
+            <!-- Agents exclude -->
+            <inputExclude>AGENTS.md</inputExclude>
+            <inputExclude>SECURITY.md</inputExclude>
+            <inputExclude>THREAT-MODEL.md</inputExclude>
           </inputExcludes>
         </configuration>
       </plugin>
@@ -847,7 +867,7 @@
             <configuration>
               <rules>
                 <requireMavenVersion>
-                  <version>[3.6.3,)</version>
+                  <version>[4.0.0-rc-5,)</version>
                 </requireMavenVersion>
               </rules>
               <fail>true</fail>
@@ -971,6 +991,9 @@
           <groupId>org.apache.plc4x.plugins</groupId>
           <artifactId>plc4x-maven-plugin</artifactId>
           <version>${plc4x-code-generation.version}</version>
+          <configuration>
+            <skip>${skip-code-generation}</skip>
+          </configuration>
         </plugin>
 
         <plugin>
@@ -982,25 +1005,25 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
-          <version>3.6.2</version>
+          <version>3.6.3</version>
         </plugin>
 
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-invoker-plugin</artifactId>
-          <version>3.9.1</version>
+          <version>3.10.1</version>
         </plugin>
 
         <plugin>
           <groupId>org.apache.felix</groupId>
           <artifactId>maven-bundle-plugin</artifactId>
-          <version>6.0.2</version>
+          <version>6.1.0</version>
         </plugin>
 
         <plugin>
           <groupId>org.apache.karaf.tooling</groupId>
           <artifactId>karaf-maven-plugin</artifactId>
-          <version>4.4.10</version>
+          <version>4.4.11</version>
         </plugin>
 
         <plugin>
@@ -1024,7 +1047,7 @@
         <plugin>
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
-          <version>0.8.14</version>
+          <version>0.8.15</version>
         </plugin>
 
         <plugin>
@@ -1032,12 +1055,9 @@
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.15.0</version>
           <configuration>
-            <!--
-              Use the eclipse compiler instead of the normal jdk one, as we were seeing
-              problems on the CI server when compiling the BACnet java driver.
-            -->
-            <compilerId>eclipse</compilerId>
             <release>${java.version}</release>
+            <!-- Make sure the parameter names are available via reflection -->
+            <parameters>true</parameters>
           </configuration>
           <dependencies>
             <dependency>
@@ -1054,7 +1074,7 @@
             <dependency>
               <groupId>org.eclipse.jdt</groupId>
               <artifactId>ecj</artifactId>
-              <version>3.45.0</version>
+              <version>3.46.0</version>
             </dependency>
           </dependencies>
         </plugin>
@@ -1062,7 +1082,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>3.5.5</version>
+          <version>3.5.6</version>
           <configuration>
             <excludedGroups>${excluded-test-groups}</excludedGroups>
           </configuration>
@@ -1071,13 +1091,13 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-failsafe-plugin</artifactId>
-          <version>3.5.5</version>
+          <version>3.5.6</version>
         </plugin>
 
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-jar-plugin</artifactId>
-          <version>3.5.0</version>
+          <version>3.5.1</version>
         </plugin>
 
         <plugin>
@@ -1226,13 +1246,13 @@
         <plugin>
           <groupId>org.sonarsource.scanner.maven</groupId>
           <artifactId>sonar-maven-plugin</artifactId>
-          <version>5.5.0.6356</version>
+          <version>5.7.0.6970</version>
         </plugin>
 
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-dependency-plugin</artifactId>
-          <version>3.10.0</version>
+          <version>3.11.0</version>
           <dependencies>
             <!--dependency>
               <groupId>org.apache.maven.shared</groupId>
@@ -1332,41 +1352,41 @@
     <!-- Build PLC4X including the C modules -->
     <profile>
       <id>with-c</id>
-      <modules>
-        <module>plc4c</module>
-      </modules>
+      <subprojects>
+        <subproject>plc4c</subproject>
+      </subprojects>
     </profile>
 
     <!-- Build PLC4X including the Go modules -->
     <profile>
       <id>with-go</id>
-      <modules>
-        <module>plc4go</module>
-      </modules>
+      <subprojects>
+        <subproject>plc4go</subproject>
+      </subprojects>
     </profile>
 
     <!-- Build PLC4X including the Java modules -->
     <profile>
       <id>with-java</id>
-      <modules>
-        <module>plc4j</module>
-      </modules>
+      <subprojects>
+        <subproject>plc4j</subproject>
+      </subprojects>
     </profile>
 
     <!-- Build PLC4X including the .Net modules -->
     <profile>
       <id>with-dotnet</id>
-      <modules>
-        <module>plc4net</module>
-      </modules>
+      <subprojects>
+        <subproject>plc4net</subproject>
+      </subprojects>
     </profile>
 
     <!-- Build PLC4X including the Python modules -->
     <profile>
       <id>with-python</id>
-      <modules>
-        <module>plc4py</module>
-      </modules>
+      <subprojects>
+        <subproject>plc4py</subproject>
+      </subprojects>
     </profile>
 
     <!-- Profile for linux x86_64 (mainly Intel Processors) (Self-Enabling) -->
@@ -1685,7 +1705,7 @@
           <plugin>
             <groupId>org.cyclonedx</groupId>
             <artifactId>cyclonedx-maven-plugin</artifactId>
-            <version>2.9.1</version>
+            <version>2.9.2</version>
             <!-- Only run this in the root module of the project -->
             <inherited>false</inherited>
             <configuration>

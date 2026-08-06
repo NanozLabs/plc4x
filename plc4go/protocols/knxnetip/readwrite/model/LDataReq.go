@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -256,7 +256,7 @@ func CastLDataReq(structType any) LDataReq {
 	return nil
 }
 
-func (m *_LDataReq) GetTypeName() string {
+func (m *_LDataReq) GetPlx4xTypeName() string {
 	return "LDataReq"
 }
 

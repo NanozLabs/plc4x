@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -176,7 +176,7 @@ func CastSecurityDataStatus2Request(structType any) SecurityDataStatus2Request {
 	return nil
 }
 
-func (m *_SecurityDataStatus2Request) GetTypeName() string {
+func (m *_SecurityDataStatus2Request) GetPlx4xTypeName() string {
 	return "SecurityDataStatus2Request"
 }
 

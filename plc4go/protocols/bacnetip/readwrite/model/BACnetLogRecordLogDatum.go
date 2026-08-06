@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -449,7 +449,7 @@ func CastBACnetLogRecordLogDatum(structType any) BACnetLogRecordLogDatum {
 	return nil
 }
 
-func (m *_BACnetLogRecordLogDatum) GetTypeName() string {
+func (m *_BACnetLogRecordLogDatum) GetPlx4xTypeName() string {
 	return "BACnetLogRecordLogDatum"
 }
 

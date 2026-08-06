@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -135,7 +135,7 @@ func CastLocaleId(structType any) LocaleId {
 	return nil
 }
 
-func (m *_LocaleId) GetTypeName() string {
+func (m *_LocaleId) GetPlx4xTypeName() string {
 	return "LocaleId"
 }
 

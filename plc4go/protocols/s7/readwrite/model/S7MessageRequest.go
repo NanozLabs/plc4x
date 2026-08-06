@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -180,7 +180,7 @@ func CastS7MessageRequest(structType any) S7MessageRequest {
 	return nil
 }
 
-func (m *_S7MessageRequest) GetTypeName() string {
+func (m *_S7MessageRequest) GetPlx4xTypeName() string {
 	return "S7MessageRequest"
 }
 

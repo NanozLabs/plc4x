@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -232,7 +232,7 @@ func CastAlarm8MessageQueryType(structType any) Alarm8MessageQueryType {
 	return nil
 }
 
-func (m *_Alarm8MessageQueryType) GetTypeName() string {
+func (m *_Alarm8MessageQueryType) GetPlx4xTypeName() string {
 	return "Alarm8MessageQueryType"
 }
 

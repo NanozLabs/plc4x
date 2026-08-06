@@ -25,11 +25,11 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -194,7 +194,7 @@ func CastS7VarPayloadDataItem(structType any) S7VarPayloadDataItem {
 	return nil
 }
 
-func (m *_S7VarPayloadDataItem) GetTypeName() string {
+func (m *_S7VarPayloadDataItem) GetPlx4xTypeName() string {
 	return "S7VarPayloadDataItem"
 }
 

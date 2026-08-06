@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -135,7 +135,7 @@ func CastRsaEncryptedSecret(structType any) RsaEncryptedSecret {
 	return nil
 }
 
-func (m *_RsaEncryptedSecret) GetTypeName() string {
+func (m *_RsaEncryptedSecret) GetPlx4xTypeName() string {
 	return "RsaEncryptedSecret"
 }
 

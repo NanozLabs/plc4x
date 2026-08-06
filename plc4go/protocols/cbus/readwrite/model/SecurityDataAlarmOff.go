@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -176,7 +176,7 @@ func CastSecurityDataAlarmOff(structType any) SecurityDataAlarmOff {
 	return nil
 }
 
-func (m *_SecurityDataAlarmOff) GetTypeName() string {
+func (m *_SecurityDataAlarmOff) GetPlx4xTypeName() string {
 	return "SecurityDataAlarmOff"
 }
 

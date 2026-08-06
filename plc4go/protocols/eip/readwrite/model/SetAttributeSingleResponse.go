@@ -24,9 +24,9 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -188,7 +188,7 @@ func CastSetAttributeSingleResponse(structType any) SetAttributeSingleResponse {
 	return nil
 }
 
-func (m *_SetAttributeSingleResponse) GetTypeName() string {
+func (m *_SetAttributeSingleResponse) GetPlx4xTypeName() string {
 	return "SetAttributeSingleResponse"
 }
 

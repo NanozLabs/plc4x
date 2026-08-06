@@ -24,11 +24,11 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	. "github.com/apache/plc4x/plc4go/spi/codegen/fields"
 	. "github.com/apache/plc4x/plc4go/spi/codegen/io"
+	"github.com/apache/plc4x/plc4go/spi/errors"
 	"github.com/apache/plc4x/plc4go/spi/utils"
 )
 
@@ -84,7 +84,7 @@ var _ AdsAddDeviceNotificationRequest = (*_AdsAddDeviceNotificationRequest)(nil)
 var _ AmsPacketRequirements = (*_AdsAddDeviceNotificationRequest)(nil)
 
 // NewAdsAddDeviceNotificationRequest factory function for _AdsAddDeviceNotificationRequest
-func NewAdsAddDeviceNotificationRequest(targetAmsNetId AmsNetId, targetAmsPort uint16, sourceAmsNetId AmsNetId, sourceAmsPort uint16, errorCode uint32, invokeId uint32, indexGroup uint32, indexOffset uint32, length uint32, transmissionMode AdsTransMode, maxDelayInMs uint32, cycleTimeInMs uint32) *_AdsAddDeviceNotificationRequest {
+func NewAdsAddDeviceNotificationRequest(targetAmsNetId AmsNetId, targetAmsPort uint16, sourceAmsNetId AmsNetId, sourceAmsPort uint16, errorCode ReturnCode, invokeId uint32, indexGroup uint32, indexOffset uint32, length uint32, transmissionMode AdsTransMode, maxDelayInMs uint32, cycleTimeInMs uint32) *_AdsAddDeviceNotificationRequest {
 	_result := &_AdsAddDeviceNotificationRequest{
 		AmsPacketContract: NewAmsPacket(targetAmsNetId, targetAmsPort, sourceAmsNetId, sourceAmsPort, errorCode, invokeId),
 		IndexGroup:        indexGroup,
@@ -296,7 +296,7 @@ func CastAdsAddDeviceNotificationRequest(structType any) AdsAddDeviceNotificatio
 	return nil
 }
 
-func (m *_AdsAddDeviceNotificationRequest) GetTypeName() string {
+func (m *_AdsAddDeviceNotificationRequest) GetPlx4xTypeName() string {
 	return "AdsAddDeviceNotificationRequest"
 }
 
