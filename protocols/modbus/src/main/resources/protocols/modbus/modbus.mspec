@@ -79,7 +79,7 @@
     [discriminator bit         errorFlag]
     [discriminator uint 7      functionFlag]
     [typeSwitch errorFlag,functionFlag,response
-        ['true'                     ModbusPDUError(response,functionFlag)
+        ['true'                     ModbusPDUError
             [simple ModbusErrorCode  exceptionCode]
         ]
 
@@ -273,10 +273,6 @@
             [array    ModbusDeviceInformationObject          objects          count            'numberOfObjects']
         ]
     ]
-]
-
-[discriminatedType ModbusPDUError(bit response, uint 7 functionFlag)
-    [simple ModbusErrorCode  exceptionCode]
 ]
 
 [type ModbusPDUReadFileRecordRequestItem

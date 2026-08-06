@@ -35,6 +35,10 @@ public class ModbusPDUError extends ModbusPDU implements Message {
   protected final boolean response;
   protected final ModbusErrorCode exceptionCode;
 
+  public ModbusPDUError(ModbusErrorCode exceptionCode) {
+    this((byte) 0, false, exceptionCode);
+  }
+
   public ModbusPDUError(byte functionFlag, boolean response, ModbusErrorCode exceptionCode) {
     this.functionFlag = functionFlag;
     this.response = response;

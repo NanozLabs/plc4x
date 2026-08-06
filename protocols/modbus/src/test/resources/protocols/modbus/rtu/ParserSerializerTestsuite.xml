@@ -98,7 +98,9 @@
               <errorFlag dataType="bit" bitLength="1">true</errorFlag>
               <functionFlag dataType="uint" bitLength="7">6</functionFlag>
               <ModbusPDUError>
-                <exceptionCode dataType="enum" bitLength="8">ILLEGAL_DATA_ADDRESS</exceptionCode>
+                <exceptionCode>
+                  <ModbusErrorCode dataType="uint" bitLength="8" stringRepresentation="ILLEGAL_DATA_ADDRESS">2</ModbusErrorCode>
+                </exceptionCode>
               </ModbusPDUError>
             </ModbusPDU>
           </pdu>
