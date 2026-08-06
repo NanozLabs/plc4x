@@ -18,28 +18,21 @@
  */
 package org.apache.plc4x.java.dlt645.server;
 
-import io.netty.buffer.ByteBuf;
 import org.apache.plc4x.java.api.model.PlcTag;
-import org.apache.plc4x.java.dlt645.Dlt645Driver;
-import org.apache.plc4x.java.dlt645.readwrite.Dlt645Frame;
 import org.apache.plc4x.java.dlt645.server.config.Dlt645ServerConfiguration;
-import org.apache.plc4x.java.dlt645.server.context.Dlt645ServerDriverContext;
-import org.apache.plc4x.java.dlt645.server.protocol.Dlt645ServerProtocolLogic;
 import org.apache.plc4x.java.dlt645.tag.Dlt645CommandTag;
 import org.apache.plc4x.java.dlt645.tag.Dlt645Tag;
-import org.apache.plc4x.java.spi.configuration.PlcConnectionConfiguration;
-import org.apache.plc4x.java.spi.configuration.PlcTransportConfiguration;
-import org.apache.plc4x.java.spi.connection.GeneratedDriverBase;
-import org.apache.plc4x.java.spi.connection.ProtocolStackConfigurer;
-import org.apache.plc4x.java.spi.connection.SingleProtocolStackConfigurer;
-import org.apache.plc4x.java.dlt645.optimizer.Dlt645BlockOptimizer;
-import org.apache.plc4x.java.spi.optimizer.BaseOptimizer;
-import org.apache.plc4x.java.transport.tcp.server.TcpServerTransportConfiguration;
+import org.apache.plc4x.java.spi.config.Configuration;
+import org.apache.plc4x.java.spi.drivers.ConnectionBase;
+import org.apache.plc4x.java.spi.drivers.DriverBase;
+import org.apache.plc4x.java.spi.transports.api.Transport;
+import org.apache.plc4x.java.spi.transports.api.TransportInstance;
+import org.apache.plc4x.java.spi.transports.api.config.TransportConfiguration;
+import org.apache.plc4x.java.transport.tcpserver.TcpServerTransportConfiguration;
+import org.apache.plc4x.java.utils.auditlog.api.AuditLog;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.ToIntFunction;
 
 /**
  * PLC4X Server Driver for DL/T 645-2007 (reverse connection mode).
@@ -48,11 +41,11 @@ import java.util.function.ToIntFunction;
  * <p>
  * Connection URI format:
  * <pre>
- * dlt645-server:tcpserver://0.0.0.0:8899
- * dlt645-server:tcpserver://0.0.0.0:8899?target-device-id=123456789012
+ * dlt645-server:tcp-server://0.0.0.0:8899
+ * dlt645-server:tcp-server://0.0.0.0:8899?target-device-id=123456789012
  * </pre>
  */
-public class Dlt645ServerDriver extends GeneratedDriverBase<Dlt645Frame> {
+public class Dlt645ServerDriver extends DriverBase {
 
     @Override
     public String getProtocolCode() {
@@ -65,37 +58,26 @@ public class Dlt645ServerDriver extends GeneratedDriverBase<Dlt645Frame> {
     }
 
     @Override
-    protected Class<? extends PlcConnectionConfiguration> getConfigurationClass() {
+    protected Class<? extends Configuration> getConfigurationClass() {
         return Dlt645ServerConfiguration.class;
     }
 
     @Override
-    protected Optional<Class<? extends PlcTransportConfiguration>> getTransportConfigurationClass(
-        String transportCode) {
-        if ("tcpserver".equals(transportCode)) {
-            return Optional.of(TcpServerTransportConfiguration.class);
+    protected Class<? extends TransportConfiguration> getTransportConfigurationClass(Transport<?> transport) {
+        if ("tcp-server".equals(transport.getTransportCode())) {
+            return TcpServerTransportConfiguration.class;
         }
-        return Optional.empty();
+        return super.getTransportConfigurationClass(transport);
     }
 
     @Override
-    protected Optional<String> getDefaultTransportCode() {
-        return Optional.of("tcpserver");
+    public Optional<String> getDefaultTransportCode() {
+        return Optional.of("tcp-server");
     }
 
     @Override
-    protected List<String> getSupportedTransportCodes() {
-        return Collections.singletonList("tcpserver");
-    }
-
-    @Override
-    protected boolean awaitSetupComplete() {
-        return false;
-    }
-
-    @Override
-    protected boolean awaitDisconnectComplete() {
-        return false;
+    public List<String> getSupportedTransportCodes() {
+        return List.of("tcp-server");
     }
 
     @Override
@@ -114,19 +96,10 @@ public class Dlt645ServerDriver extends GeneratedDriverBase<Dlt645Frame> {
     }
 
     @Override
-    protected BaseOptimizer getOptimizer() {
-        return new Dlt645BlockOptimizer();
-    }
-
-    @Override
-    protected ProtocolStackConfigurer<Dlt645Frame> getStackConfigurer() {
-        return SingleProtocolStackConfigurer.builder(
-                Dlt645Frame.class,
-                io -> Dlt645Frame.staticParse(io, true))
-            .withProtocol(Dlt645ServerProtocolLogic.class)
-            .withDriverContext(Dlt645ServerDriverContext.class)
-            .withPacketSizeEstimator(Dlt645Driver.Dlt645ByteLengthEstimator.class)
-            .build();
+    protected ConnectionBase<Dlt645ServerConfiguration> getConnection(Configuration configuration,
+                                                                      TransportInstance<?> transportInstance,
+                                                                      AuditLog auditLog) {
+        return new Dlt645ServerConnection((Dlt645ServerConfiguration) configuration, transportInstance, auditLog);
     }
 
     @Override

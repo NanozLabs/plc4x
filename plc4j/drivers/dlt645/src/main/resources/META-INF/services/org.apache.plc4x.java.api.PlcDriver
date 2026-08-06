@@ -17,3 +17,4 @@
 # under the License.
 #
 org.apache.plc4x.java.dlt645.Dlt645Driver
+org.apache.plc4x.java.dlt645.server.Dlt645ServerDriver

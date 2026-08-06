@@ -18,37 +18,44 @@
  */
 package org.apache.plc4x.java.dlt645.server;
 
-import io.netty.channel.Channel;
-import org.apache.plc4x.java.api.PlcConnection;
+import org.apache.plc4x.java.api.exceptions.PlcConnectionException;
 import org.apache.plc4x.java.api.exceptions.PlcRuntimeException;
-import org.apache.plc4x.java.dlt645.server.protocol.Dlt645ServerProtocolLogic;
-import org.apache.plc4x.java.spi.connection.AbstractPlcConnection;
-import org.apache.plc4x.java.spi.connection.DefaultNettyPlcConnection;
-import org.apache.plc4x.java.transport.tcp.server.DeviceChannelRegistry;
-import org.apache.plc4x.java.transport.tcp.server.DeviceConversationHandler;
-import org.apache.plc4x.java.transport.tcp.server.TcpServerChannelFactory;
+import org.apache.plc4x.java.dlt645.server.config.Dlt645ServerConfiguration;
+import org.apache.plc4x.java.dlt645.tag.Dlt645TagHandler;
+import org.apache.plc4x.java.spi.drivers.tags.PlcTagHandler;
+import org.apache.plc4x.java.spi.transports.api.TransportInstance;
+import org.apache.plc4x.java.spi.values.DefaultPlcValueHandler;
+import org.apache.plc4x.java.spi.values.PlcValueHandler;
+import org.apache.plc4x.java.transport.tcpserver.RoutingTransportInstance;
+import org.apache.plc4x.java.transport.tcpserver.TcpServerChannelRegistry;
+import org.apache.plc4x.java.transport.tcpserver.TcpServerTransportInstance;
+import org.apache.plc4x.java.utils.auditlog.api.AuditLog;
+import org.apache.plc4x.java.utils.subscriptionemulation.PollingSubscriptionConnectionBase;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
- * DL/T 645-2007 Server Connection facade.
+ * DL/T 645-2007 Server connection (reverse TCP mode).
  * <p>
- * Wraps a server-mode {@link PlcConnection} and provides:
+ * Listens (via the {@code tcp-server} transport) for inbound connections from smart meters
+ * or DTU devices, each of which registers its device-id. This connection is the server-side
+ * management handle and provides:
  * <ul>
  *   <li>Device management: discovery, events, status queries</li>
  *   <li>Sub-connection factory: {@link #getDeviceConnection(String)} returns a
- *       {@link Dlt645DeviceConnection} that is a standard {@link PlcConnection}
- *       bound to one specific device — clean tag format, no device-id in tags</li>
+ *       {@link Dlt645DeviceConnection} that is a standard {@code PlcConnection} bound to one
+ *       specific device — clean tag format, no device-id in tags</li>
  * </ul>
  *
  * <pre>{@code
- * PlcConnection conn = manager.getConnection("dlt645-server:tcpserver://0.0.0.0:8899?...");
- * Dlt645ServerConnection server = Dlt645ServerConnection.of(conn);
+ * PlcConnection conn = manager.getConnection("dlt645-server:tcp-server://0.0.0.0:8899?...");
+ * Dlt645ServerConnection server = (Dlt645ServerConnection) conn;
  *
  * // Event-driven device discovery
  * server.onDeviceConnected(event -> {
@@ -59,61 +66,58 @@ import java.util.function.Consumer;
  * });
  * }</pre>
  */
-public class Dlt645ServerConnection {
+public class Dlt645ServerConnection extends PollingSubscriptionConnectionBase<Dlt645ServerConfiguration> {
 
-    private final PlcConnection serverConnection;
-    private final DeviceChannelRegistry deviceRegistry;
-    private final byte[] password;
-    private final byte[] operatorCode;
-    private final Duration requestTimeout;
+    private static final Logger logger = LoggerFactory.getLogger(Dlt645ServerConnection.class);
+
     private final ConcurrentHashMap<String, Dlt645DeviceConnection> deviceConnections = new ConcurrentHashMap<>();
+    private TcpServerChannelRegistry deviceRegistry;
 
-    /**
-     * Create a Dlt645ServerConnection from a server-mode PlcConnection.
-     *
-     * @param connection a dlt645-server PlcConnection (must be connected)
-     * @return the server connection facade
-     * @throws PlcRuntimeException if the connection is not a DL/T 645 server connection
-     */
-    public static Dlt645ServerConnection of(PlcConnection connection) {
-        return new Dlt645ServerConnection(connection);
+    public Dlt645ServerConnection(Dlt645ServerConfiguration configuration,
+                                  TransportInstance<?> transportInstance,
+                                  AuditLog auditLog) {
+        super(configuration, transportInstance, auditLog);
     }
 
-    private Dlt645ServerConnection(PlcConnection connection) {
-        this.serverConnection = connection;
+    @Override
+    protected PlcTagHandler getTagHandler() {
+        return new Dlt645TagHandler();
+    }
 
-        if (!(connection instanceof DefaultNettyPlcConnection)) {
-            throw new PlcRuntimeException(
-                "Connection is not a DefaultNettyPlcConnection. " +
-                "Use a dlt645-server:tcpserver:// connection URL.");
+    @Override
+    protected PlcValueHandler getValueHandler() {
+        return new DefaultPlcValueHandler();
+    }
+
+    @Override
+    protected void onConnect() throws PlcConnectionException {
+        // The tcp-server transport hands the driver a RoutingTransportInstance that
+        // multiplexes all registered device connections and exposes the shared registry.
+        if (!(getTransportInstance() instanceof RoutingTransportInstance routing)) {
+            throw new PlcConnectionException(
+                "DL/T 645 server mode requires the 'tcp-server' transport");
         }
-
-        var nettyConnection = (DefaultNettyPlcConnection) connection;
-
-        if (!(nettyConnection.getChannelFactory() instanceof TcpServerChannelFactory)) {
-            throw new PlcRuntimeException(
-                "Connection is not using TcpServerChannelFactory. " +
-                "Use a dlt645-server:tcpserver:// connection URL.");
-        }
-
-        var channelFactory = (TcpServerChannelFactory) nettyConnection.getChannelFactory();
-        this.deviceRegistry = channelFactory.getDeviceRegistry();
+        this.deviceRegistry = routing.getRegistry();
         if (this.deviceRegistry == null) {
-            throw new PlcRuntimeException("Device registry not initialized. Connection may not be fully established.");
+            throw new PlcConnectionException("Device registry not initialized");
         }
 
-        // Extract auth config from protocol logic
-        var protocol = ((AbstractPlcConnection) connection).getProtocol();
-        if (protocol instanceof Dlt645ServerProtocolLogic) {
-            var serverLogic = (Dlt645ServerProtocolLogic) protocol;
-            this.password = serverLogic.getPassword();
-            this.operatorCode = serverLogic.getOperatorCode();
-            this.requestTimeout = serverLogic.getRequestTimeout();
-        } else {
-            this.password = new byte[4];
-            this.operatorCode = new byte[4];
-            this.requestTimeout = Duration.ofMillis(10_000);
-        }
+        // Device events: a fresh Dlt645DeviceConnection is created lazily by getDeviceConnection().
+        this.deviceRegistry.addRegistrationListener(info -> {
+            logger.info("DL/T 645 device connected: {}", info.getDeviceId());
+        });
+        this.deviceRegistry.addDisconnectionListener(info -> {
+            deviceConnections.remove(info.getDeviceId());
+            logger.info("DL/T 645 device disconnected: {}", info.getDeviceId());
+        });
+        logger.info("DL/T 645-2007 server connection established");
+    }
+
+    @Override
+    public boolean isConnected() {
+        // The server connection is a logical view: it stays connected as long as the
+        // server socket is alive (the routing instance reports itself open).
+        return deviceRegistry != null && getTransportInstance().isOpen();
     }
 
     // ========================================
@@ -123,9 +127,9 @@ public class Dlt645ServerConnection {
     /**
      * Get a device-scoped sub-connection.
      * <p>
-     * The returned {@link Dlt645DeviceConnection} implements {@link PlcConnection},
-     * so it can be used exactly like a standard PLC4X connection — with clean tag format,
-     * no device-id needed in tags.
+     * The returned {@link Dlt645DeviceConnection} implements {@code PlcConnection}, so it can
+     * be used exactly like a standard PLC4X connection — with clean tag format, no device-id
+     * needed in tags.
      * <p>
      * Connections are cached: calling this method twice with the same deviceId returns the same instance.
      *
@@ -135,27 +139,24 @@ public class Dlt645ServerConnection {
      */
     public Dlt645DeviceConnection getDeviceConnection(String deviceId) {
         return deviceConnections.compute(deviceId, (id, existing) -> {
-            // Reuse existing if still connected
-            if (existing != null && existing.isConnected()) {
+            // Reuse existing if still online.
+            if (existing != null && existing.isDeviceOnline()) {
                 return existing;
             }
-
-            // Create new device connection
-            Channel channel = deviceRegistry.getChannel(id);
-            if (channel == null || !channel.isActive()) {
-                throw new PlcRuntimeException("Device not connected: " + id);
-            }
-
-            @SuppressWarnings("unchecked")
-            DeviceConversationHandler<org.apache.plc4x.java.dlt645.readwrite.Dlt645Frame> handler =
-                DeviceConversationHandler.getFromChannel(channel);
-            if (handler == null) {
-                throw new PlcRuntimeException("Device handler not found for: " + id);
-            }
-
-            return new Dlt645DeviceConnection(id, channel, handler,
-                password, operatorCode, requestTimeout);
+            TcpServerTransportInstance connection = resolveDeviceTransport(id);
+            return new Dlt645DeviceConnection(id, connection, getConfiguration(), auditLog);
         });
+    }
+
+    private TcpServerTransportInstance resolveDeviceTransport(String deviceId) {
+        if (deviceRegistry == null) {
+            throw new PlcRuntimeException("Device registry not available");
+        }
+        TcpServerTransportInstance connection = deviceRegistry.getConnection(deviceId);
+        if (connection == null || !connection.isOpen()) {
+            throw new PlcRuntimeException("Device not connected: " + deviceId);
+        }
+        return connection;
     }
 
     // ========================================
@@ -166,6 +167,9 @@ public class Dlt645ServerConnection {
      * Subscribe to device connection events.
      */
     public Dlt645ServerConnection onDeviceConnected(Consumer<DeviceEvent> listener) {
+        if (deviceRegistry == null) {
+            throw new IllegalStateException("Connection must be connected before subscribing to device events");
+        }
         deviceRegistry.addRegistrationListener(info ->
             listener.accept(new DeviceEvent(
                 info.getDeviceId(),
@@ -181,8 +185,10 @@ public class Dlt645ServerConnection {
      * Subscribe to device disconnection events.
      */
     public Dlt645ServerConnection onDeviceDisconnected(Consumer<DeviceEvent> listener) {
+        if (deviceRegistry == null) {
+            throw new IllegalStateException("Connection must be connected before subscribing to device events");
+        }
         deviceRegistry.addDisconnectionListener(info -> {
-            // Clean up cached connection
             deviceConnections.remove(info.getDeviceId());
             listener.accept(new DeviceEvent(
                 info.getDeviceId(),
@@ -198,28 +204,24 @@ public class Dlt645ServerConnection {
     // Device Status Queries
     // ========================================
 
-    public PlcConnection getConnection() {
-        return serverConnection;
-    }
-
-    public DeviceChannelRegistry getDeviceRegistry() {
+    public TcpServerChannelRegistry getDeviceRegistry() {
         return deviceRegistry;
     }
 
     public Set<String> getConnectedDevices() {
-        return deviceRegistry.getRegisteredDevices();
+        return deviceRegistry != null ? deviceRegistry.getRegisteredDevices() : Set.of();
     }
 
     public int getConnectedDeviceCount() {
-        return deviceRegistry.getDeviceCount();
+        return deviceRegistry != null ? deviceRegistry.getDeviceCount() : 0;
     }
 
     public boolean isDeviceConnected(String deviceId) {
-        return deviceRegistry.isRegistered(deviceId);
+        return deviceRegistry != null && deviceRegistry.isRegistered(deviceId);
     }
 
     public DeviceInfo getDeviceInfo(String deviceId) {
-        DeviceChannelRegistry.DeviceInfo info = deviceRegistry.getDeviceInfo(deviceId);
+        TcpServerChannelRegistry.DeviceInfo info = deviceRegistry != null ? deviceRegistry.getDeviceInfo(deviceId) : null;
         if (info == null) {
             return null;
         }
@@ -229,7 +231,7 @@ public class Dlt645ServerConnection {
 
     public boolean disconnectDevice(String deviceId) {
         deviceConnections.remove(deviceId);
-        return deviceRegistry.unregister(deviceId);
+        return deviceRegistry != null && deviceRegistry.unregister(deviceId);
     }
 
     // ========================================

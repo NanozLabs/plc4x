@@ -37,21 +37,6 @@
 
   <build>
     <plugins>
-      <!--
-        The server/ sub-package (Dlt645ServerDriver and friends) depends on the
-        legacy SPI2 classes (GeneratedDriverBase, spi.connection.*, tcp-server
-        transport) that no longer exist in SPI3. It is excluded from the build
-        until a SPI3-based server transport is available.
-      -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <configuration>
-          <excludes>
-            <exclude>org/apache/plc4x/java/dlt645/server/**</exclude>
-          </excludes>
-        </configuration>
-      </plugin>
       <plugin>
         <groupId>org.apache.karaf.tooling</groupId>
         <artifactId>karaf-maven-plugin</artifactId>
@@ -159,6 +144,11 @@
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-transports-tcp</artifactId>
+      <version>1.0.0-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.plc4x</groupId>
+      <artifactId>plc4j-transports-tcp-server</artifactId>
       <version>1.0.0-SNAPSHOT</version>
     </dependency>
 
