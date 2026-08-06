@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.plc4x.java.spi.registration;
+package org.apache.plc4x.java.transport.tcp.server.registration;
 
 import java.util.Objects;
 import java.util.Optional;

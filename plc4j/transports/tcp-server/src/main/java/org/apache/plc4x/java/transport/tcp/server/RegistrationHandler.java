@@ -25,8 +25,8 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.ScheduledFuture;
-import org.apache.plc4x.java.spi.registration.RegistrationPacketParser;
-import org.apache.plc4x.java.spi.registration.RegistrationResult;
+import org.apache.plc4x.java.transport.tcp.server.registration.RegistrationPacketParser;
+import org.apache.plc4x.java.transport.tcp.server.registration.RegistrationResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

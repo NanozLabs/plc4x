@@ -29,8 +29,8 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 import org.apache.plc4x.java.api.exceptions.PlcConnectionException;
 import org.apache.plc4x.java.spi.configuration.HasConfiguration;
 import org.apache.plc4x.java.spi.connection.ChannelFactory;
-import org.apache.plc4x.java.spi.registration.RegistrationPacketParser;
-import org.apache.plc4x.java.spi.registration.RegistrationParserFactory;
+import org.apache.plc4x.java.transport.tcp.server.registration.RegistrationPacketParser;
+import org.apache.plc4x.java.transport.tcp.server.registration.RegistrationParserFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

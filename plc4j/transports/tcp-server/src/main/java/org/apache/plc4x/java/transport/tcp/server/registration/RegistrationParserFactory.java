@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.plc4x.java.spi.registration;
+package org.apache.plc4x.java.transport.tcp.server.registration;
 
-import org.apache.plc4x.java.spi.registration.impl.DelimiterParser;
-import org.apache.plc4x.java.spi.registration.impl.FixedLengthParser;
-import org.apache.plc4x.java.spi.registration.impl.PrefixLengthParser;
-import org.apache.plc4x.java.spi.registration.impl.RegexParser;
+import org.apache.plc4x.java.transport.tcp.server.registration.impl.DelimiterParser;
+import org.apache.plc4x.java.transport.tcp.server.registration.impl.FixedLengthParser;
+import org.apache.plc4x.java.transport.tcp.server.registration.impl.PrefixLengthParser;
+import org.apache.plc4x.java.transport.tcp.server.registration.impl.RegexParser;
 
 import java.nio.ByteOrder;
 import java.nio.charset.Charset;

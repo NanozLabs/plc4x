@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.plc4x.java.spi.registration.impl;
+package org.apache.plc4x.java.transport.tcp.server.registration.impl;
 
 import io.netty.buffer.ByteBuf;
-import org.apache.plc4x.java.spi.registration.RegistrationPacketParser;
-import org.apache.plc4x.java.spi.registration.RegistrationResult;
+import org.apache.plc4x.java.transport.tcp.server.registration.RegistrationPacketParser;
+import org.apache.plc4x.java.transport.tcp.server.registration.RegistrationResult;
 
 import java.nio.ByteOrder;
 import java.nio.charset.Charset;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.plc4x.java.spi.registration;
+package org.apache.plc4x.java.transport.tcp.server.registration;
 
 import io.netty.buffer.ByteBuf;
 
@@ -39,9 +39,9 @@ import io.netty.buffer.ByteBuf;
  * </ul>
  *
  * @see RegistrationResult
- * @see org.apache.plc4x.java.spi.registration.impl.FixedLengthParser
- * @see org.apache.plc4x.java.spi.registration.impl.RegexParser
- * @see org.apache.plc4x.java.spi.registration.impl.PrefixLengthParser
+ * @see org.apache.plc4x.java.transport.tcp.server.registration.impl.FixedLengthParser
+ * @see org.apache.plc4x.java.transport.tcp.server.registration.impl.RegexParser
+ * @see org.apache.plc4x.java.transport.tcp.server.registration.impl.PrefixLengthParser
  * @since 0.14.0
  */
 public interface RegistrationPacketParser {
