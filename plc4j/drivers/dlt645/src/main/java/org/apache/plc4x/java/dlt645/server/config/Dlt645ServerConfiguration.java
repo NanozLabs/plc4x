@@ -34,6 +34,12 @@ import org.apache.plc4x.java.spi.config.annotations.defaults.IntDefaultValue;
  */
 public class Dlt645ServerConfiguration extends Dlt645Configuration {
 
+    public Dlt645ServerConfiguration() {
+        // Server mode default: 10s (client default is 5s, set in Dlt645Configuration).
+        // An explicit request-timeout URL parameter still overrides this via reflection.
+        requestTimeout = 10_000;
+    }
+
     @ConfigurationParameter("target-device-id")
     @Description("Target meter address for operations. If not specified, uses broadcast address.")
     private String targetDeviceId;

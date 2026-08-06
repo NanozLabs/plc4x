@@ -27,9 +27,8 @@ import org.apache.plc4x.java.spi.config.annotations.defaults.StringDefaultValue;
 public class Dlt645Configuration implements Configuration {
 
     @ConfigurationParameter("request-timeout")
-    @IntDefaultValue(5_000)
-    @Description("Default timeout for all types of requests in milliseconds.")
-    private int requestTimeout;
+    @Description("Default timeout for all types of requests in milliseconds. Default 5000 for client mode, overridden by subclasses (e.g. server mode).")
+    protected int requestTimeout = 5_000;
 
     @ConfigurationParameter("meter-address")
     @StringDefaultValue("999999999999")
