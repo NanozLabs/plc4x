@@ -75,6 +75,7 @@ public class ModbusTcpConnection extends PollingSubscriptionConnectionBase<Modbu
     @Override
     protected void onConnect() throws PlcConnectionException {
         messageCodec = new ModbusTcpMessageCodec(transportInstance, this::handleIncomingMessage);
+        registerCodecEventListener(messageCodec);
 
         startReceiving(() -> {
             try {

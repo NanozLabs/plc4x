@@ -18,6 +18,8 @@
  */
 package org.apache.plc4x.java.spi.drivers;
 
+import org.apache.plc4x.java.api.listener.EventListener;
+import org.apache.plc4x.java.api.listener.MessageExchangeListener;
 import org.apache.plc4x.java.spi.buffers.api.Message;
 import org.apache.plc4x.java.spi.buffers.api.exceptions.BufferException;
 import org.apache.plc4x.java.spi.buffers.bytebased.ReadBufferByteBased;
@@ -28,6 +30,8 @@ import org.apache.plc4x.java.spi.transports.api.exceptions.TransportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -48,12 +52,55 @@ public abstract class MessageCodecBase<M extends Message> {
     protected final String protocolName;
     protected final TransportInstance<?> transportInstance;
     protected final Consumer<M> messageHandler;
+    private final List<EventListener> eventListeners = new ArrayList<>();
 
     protected MessageCodecBase(String protocolName, TransportInstance<?> transportInstance, Consumer<M> messageHandler) {
         this.logger = LoggerFactory.getLogger(getClass());
         this.protocolName = protocolName;
         this.transportInstance = transportInstance;
         this.messageHandler = messageHandler;
+    }
+
+    /**
+     * 注册报文交换监听器（per-connection）。在报文收发时触发 {@link MessageExchangeListener}。
+     */
+    public void addEventListener(EventListener listener) {
+        if (listener != null) {
+            synchronized (eventListeners) {
+                eventListeners.add(listener);
+            }
+        }
+    }
+
+    public void removeEventListener(EventListener listener) {
+        if (listener != null) {
+            synchronized (eventListeners) {
+                eventListeners.remove(listener);
+            }
+        }
+    }
+
+    protected void fireMessageExchange(boolean sending, M message) {
+        List<EventListener> copy;
+        synchronized (eventListeners) {
+            if (eventListeners.isEmpty()) {
+                return;
+            }
+            copy = new ArrayList<>(eventListeners);
+        }
+        for (EventListener listener : copy) {
+            if (listener instanceof MessageExchangeListener exchangeListener) {
+                try {
+                    if (sending) {
+                        exchangeListener.sending(message);
+                    } else {
+                        exchangeListener.received(message);
+                    }
+                } catch (Exception e) {
+                    logger.warn("Error notifying message exchange listener", e);
+                }
+            }
+        }
     }
 
     protected abstract int getMinimumHeaderSize();
@@ -81,6 +128,7 @@ public abstract class MessageCodecBase<M extends Message> {
                 logger.trace("Sending {} message: {} bytes", protocolName, messageBytes.length);
             }
 
+            fireMessageExchange(true, message);
             transportInstance.write(messageBytes);
         } catch (BufferException e) {
             throw new MessageCodecException("Failed to serialize " + protocolName + " message", e);
@@ -121,6 +169,7 @@ public abstract class MessageCodecBase<M extends Message> {
 
                 ReadBufferByteBased readBuffer = createReadBuffer(messageBytes);
                 M message = parseMessage(readBuffer);
+                fireMessageExchange(false, message);
                 messageHandler.accept(message);
             }
         } catch (TransportException e) {

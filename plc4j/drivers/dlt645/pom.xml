@@ -23,7 +23,7 @@
   <parent>
     <groupId>org.apache.plc4x</groupId>
     <artifactId>plc4j-drivers</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0-nanoz-SNAPSHOT</version>
   </parent>
 
   <artifactId>plc4j-driver-dlt645</artifactId>
@@ -84,78 +84,73 @@
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-api</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-spi-buffers-api</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-spi-buffers-byte</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-spi-config</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-spi-fields</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-spi-utils</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-spi-values</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-spi-drivers</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-utils-subscription-emulation</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-transports-api</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-utils-audit-log-api</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-transports-serial</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-transports-tcp</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.plc4x</groupId>
-      <artifactId>plc4j-transports-tcp-server</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
     </dependency>
 
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-utils-test-utils</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -167,7 +162,7 @@
     <dependency>
       <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4x-protocols-dlt645</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
       <classifier>tests</classifier>
       <type>test-jar</type>
       <scope>test</scope>
@@ -205,14 +200,14 @@
         <dependency>
           <groupId>org.apache.plc4x</groupId>
           <artifactId>plc4x-code-generation-language-java</artifactId>
-          <version>1.0.0-SNAPSHOT</version>
+          <version>1.0.0-nanoz-SNAPSHOT</version>
           <scope>provided</scope>
         </dependency>
 
         <dependency>
           <groupId>org.apache.plc4x</groupId>
           <artifactId>plc4x-protocols-dlt645</artifactId>
-          <version>1.0.0-SNAPSHOT</version>
+          <version>1.0.0-nanoz-SNAPSHOT</version>
           <scope>provided</scope>
         </dependency>
       </dependencies>

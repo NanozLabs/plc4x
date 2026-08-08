@@ -778,7 +778,9 @@ public class Dlt645Connection extends PollingSubscriptionConnectionBase<Dlt645Co
     }
 
     /**
-     * Format 6-byte address (LSB first wire order) as MSB-first hex string.
+     * Format 6-byte address (LSB first, bit-reversed wire order) as MSB-first hex string.
+     * Each wire byte is bit-reversed back to its BCD form before the reversed
+     * concatenation (DL/T 645-2007 6.1.2).
      */
     private static String formatAddressMsbFirst(byte[] addrBytes) {
         if (addrBytes == null || addrBytes.length < 6) {
@@ -786,7 +788,7 @@ public class Dlt645Connection extends PollingSubscriptionConnectionBase<Dlt645Co
         }
         var sb = new StringBuilder(12);
         for (int i = 5; i >= 0; i--) {
-            sb.append(String.format("%02X", addrBytes[i] & 0xFF));
+            sb.append(String.format("%02X", StaticHelper.bitReverse(addrBytes[i]) & 0xFF));
         }
         return sb.toString();
     }

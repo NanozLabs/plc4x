@@ -83,6 +83,8 @@ public abstract class ConnectionBase<C extends Configuration> implements PlcConn
 
     // Event listeners for connection state changes
     private final List<EventListener> eventListeners = new ArrayList<>();
+    // 该连接自己的 codec（由 registerCodecEventListener 设置），用于把后续注册的 listener 同步到 codec
+    private volatile MessageCodecBase<?> messageCodec;
 
     public ConnectionBase(C configuration, TransportInstance<?> transportInstance, AuditLog auditLog) {
         this.configuration = configuration;
@@ -437,6 +439,11 @@ public abstract class ConnectionBase<C extends Configuration> implements PlcConn
             synchronized (eventListeners) {
                 eventListeners.add(listener);
             }
+            // 若 codec 已建立，把新 listener 同步过去，使报文收发立即触发
+            MessageCodecBase<?> codec = this.messageCodec;
+            if (codec != null) {
+                codec.addEventListener(listener);
+            }
         }
     }
 
@@ -445,6 +452,27 @@ public abstract class ConnectionBase<C extends Configuration> implements PlcConn
         if (listener != null) {
             synchronized (eventListeners) {
                 eventListeners.remove(listener);
+            }
+            MessageCodecBase<?> codec = this.messageCodec;
+            if (codec != null) {
+                codec.removeEventListener(listener);
+            }
+        }
+    }
+
+    /**
+     * 把本连接已注册的事件监听器注入到该连接自己的 codec，
+     * 使 codec 在报文收发时触发 {@link MessageExchangeListener}（per-connection）。
+     * 驱动在 onConnect() 创建 codec 后调用。
+     */
+    protected void registerCodecEventListener(MessageCodecBase<?> codec) {
+        if (codec == null) {
+            return;
+        }
+        this.messageCodec = codec;
+        synchronized (eventListeners) {
+            for (EventListener listener : eventListeners) {
+                codec.addEventListener(listener);
             }
         }
     }

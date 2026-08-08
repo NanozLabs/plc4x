@@ -33,31 +33,24 @@ public class StaticHelper {
     private static final int FRAME_END = 0x16;
     private static final int HEADER_SIZE_WITHOUT_DATA = 10; // 68 + addr(6) + 68 + control + length
     private static final int FIXED_FRAME_OVERHEAD = 12;     // start + addr + start + control + length + cs + end
-    private static final int CONTROL_INDEX = 8;
     private static final int LENGTH_INDEX = 9;
-    private static final int DATA_START_INDEX = 10;
 
     private StaticHelper() {
         // Utility class
     }
 
     /**
-     * Checksum = mod-256 sum of control + length + data(wire bytes, +0x33 encoded).
-     * checksumRawData includes all bytes parsed/written up to checksum field.
+     * Reverse the bit order of a byte (e.g. 0x12 -> 0x48).
+     * DL/T 645-2007 transmits address bytes 低位在前 (bit-reversed).
      */
-    public static short calcCsFromRaw(byte[] checksumRawData) {
-        if (checksumRawData == null || checksumRawData.length < HEADER_SIZE_WITHOUT_DATA) {
-            return 0;
+    public static byte bitReverse(byte b) {
+        int v = b & 0xFF;
+        int r = 0;
+        for (int i = 0; i < 8; i++) {
+            r = (r << 1) | (v & 1);
+            v >>= 1;
         }
-
-        int declaredLength = checksumRawData[LENGTH_INDEX] & 0xFF;
-        int availableLength = Math.max(0, Math.min(declaredLength, checksumRawData.length - DATA_START_INDEX));
-
-        int sum = (checksumRawData[CONTROL_INDEX] & 0xFF) + (checksumRawData[LENGTH_INDEX] & 0xFF);
-        for (int i = 0; i < availableLength; i++) {
-            sum += checksumRawData[DATA_START_INDEX + i] & 0xFF;
-        }
-        return (short) (sum & 0xFF);
+        return (byte) r;
     }
 
     /**

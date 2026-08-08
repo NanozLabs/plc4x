@@ -18,6 +18,8 @@
  */
 package org.apache.plc4x.java.dlt645.context;
 
+import org.apache.plc4x.java.dlt645.readwrite.utils.StaticHelper;
+
 /**
  * DL/T 645-2007 helper utilities for the driver.
  * <p>
@@ -34,11 +36,12 @@ public final class Dlt645DriverContext {
      * Parse 12-hex-digit meter address string into 6-byte array in wire order.
      * <p>
      * DL/T 645-2007 Section 4.2: Address field is 6 bytes BCD, transmitted
-     * A0 (low byte) first, A5 (high byte) last. The input string is in
-     * human-readable order (MSB first, as printed on the meter label),
-     * and is reversed to wire order (LSB first) for transmission.
+     * A0 (low byte) first, A5 (high byte) last, and each byte is transmitted
+     * with its bit order reversed (低位在前). The input string is in
+     * human-readable order (MSB first, as printed on the meter label).
      * <p>
-     * Example: "123456789012" → wire bytes [0x12, 0x90, 0x78, 0x56, 0x34, 0x12]
+     * Example: "123456789012" → wire bytes [0x48, 0x09, 0x1E, 0x6A, 0x2C, 0x48]
+     * (byte order reversed AND each byte bit-reversed).
      */
     public static byte[] parseMeterAddress(String addressStr) {
         if (addressStr == null || addressStr.isEmpty()) {
@@ -51,11 +54,12 @@ public final class Dlt645DriverContext {
         for (int i = 0; i < 6; i++) {
             bytes[i] = (byte) Integer.parseInt(padded.substring(i * 2, i * 2 + 2), 16);
         }
-        // Reverse to DL/T 645-2007 wire order: A0 (low byte) first
+        // Reverse to DL/T 645-2007 wire order: A0 (low byte) first, then
+        // bit-reverse each byte (低位在前 per 6.1.2).
         for (int i = 0; i < 3; i++) {
             byte tmp = bytes[i];
-            bytes[i] = bytes[5 - i];
-            bytes[5 - i] = tmp;
+            bytes[i] = StaticHelper.bitReverse(bytes[5 - i]);
+            bytes[5 - i] = StaticHelper.bitReverse(tmp);
         }
         return bytes;
     }

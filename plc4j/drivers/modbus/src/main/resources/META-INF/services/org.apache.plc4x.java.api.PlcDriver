@@ -19,4 +19,3 @@
 org.apache.plc4x.java.modbus.tcp.ModbusTcpDriver
 org.apache.plc4x.java.modbus.rtu.ModbusRtuDriver
 org.apache.plc4x.java.modbus.ascii.ModbusAsciiDriver
-org.apache.plc4x.java.modbus.tcpserver.ModbusTcpServerDriver

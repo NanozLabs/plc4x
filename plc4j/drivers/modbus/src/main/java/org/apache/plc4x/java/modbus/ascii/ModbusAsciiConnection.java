@@ -80,6 +80,7 @@ public class ModbusAsciiConnection extends PollingSubscriptionConnectionBase<Mod
     @Override
     protected void onConnect() throws PlcConnectionException {
         messageCodec = new ModbusAsciiMessageCodec(transportInstance, this::handleIncomingMessage);
+        registerCodecEventListener(messageCodec);
 
         startReceiving(() -> {
             try {

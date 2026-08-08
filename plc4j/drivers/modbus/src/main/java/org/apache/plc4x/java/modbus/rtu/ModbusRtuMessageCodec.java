@@ -163,6 +163,7 @@ public class ModbusRtuMessageCodec extends MessageCodecBase<ModbusRtuADU> {
                 }
                 getTransportInstance().read(expectedSize); // consume the validated frame
                 noteResyncComplete();
+                fireMessageExchange(false, message);
                 messageHandler.accept(message);
             }
         } catch (TransportException e) {

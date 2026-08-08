@@ -80,6 +80,7 @@ public class ModbusRtuConnection extends PollingSubscriptionConnectionBase<Modbu
     @Override
     protected void onConnect() throws PlcConnectionException {
         messageCodec = new ModbusRtuMessageCodec(transportInstance, this::handleIncomingMessage);
+        registerCodecEventListener(messageCodec);
 
         startReceiving(() -> {
             try {
