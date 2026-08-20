@@ -165,11 +165,14 @@ type ${type.name}Requirements interface {
 	<#if type.isDiscriminatedChildTypeDefinition()>
 		${type.parentType.orElseThrow().name?cap_first}Requirements
 	</#if>
-	GetLengthInBits(ctx context.Context) uint16
-	GetLengthInBytes(ctx context.Context) uint16
+	GetLengthInBits(ctx context.Context) uint64
+	GetLengthInBytes(ctx context.Context) uint64
 	<#list helper.discriminatorTypes as discriminatorName, discriminatorType>
-	<#-- If the discriminator name matches that of another field, suppress the methods generation -->
-		<#if type.isDiscriminatorField(discriminatorName)>
+	<#-- If the discriminator name matches that of another field, suppress the methods generation.
+	     isDiscriminatorField only sees the parent's discriminators, so a type carrying a nested
+	     typeSwitch of its own also has to be asked directly - otherwise this interface lacks the
+	     accessor that this type's own serializer calls. -->
+		<#if type.isDiscriminatorField(discriminatorName) || helper.declaresDiscriminatorField(type, discriminatorName)>
 	// Get${discriminatorName?cap_first} returns ${discriminatorName?cap_first} (discriminator field)
 	Get${discriminatorName?cap_first}() <#if discriminatorType.isNonSimpleTypeReference() && !discriminatorType.isEnumTypeReference()>I</#if>${helper.getLanguageTypeNameForTypeReference(discriminatorType)}
 		</#if>
@@ -654,11 +657,11 @@ func (m *_${type.name}) GetPlx4xTypeName() string {
 }
 
 <#if !type.isDiscriminatedParentTypeDefinition()>
-func (m *_${type.name}) GetLengthInBits(ctx context.Context) uint16 {
+func (m *_${type.name}) GetLengthInBits(ctx context.Context) uint64 {
 		<#if type.isDiscriminatedChildTypeDefinition()>
-	lengthInBits := uint16(m.${type.getParentType().orElseThrow().name}Contract.(*_${type.getParentType().orElseThrow().name}).getLengthInBits(ctx))
+	lengthInBits := uint64(m.${type.getParentType().orElseThrow().name}Contract.(*_${type.getParentType().orElseThrow().name}).getLengthInBits(ctx))
 		<#else>
-	lengthInBits := uint16(0)
+	lengthInBits := uint64(0)
 		</#if>
 		<#list type.fields as field>
 			<#switch field.typeName>
@@ -670,10 +673,10 @@ func (m *_${type.name}) GetLengthInBits(ctx context.Context) uint16 {
 	if len(m.${arrayField.name?cap_first}) > 0 {
 				<#if arrayElementType.isVstringTypeReference()>
                     <#assign vstringTypeReference = arrayElementType.asVstringTypeReference().orElseThrow()>
-		lengthInBits += uint16(${helper.toSerializationExpression(arrayField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)}) * uint16(len(m.${arrayField.name?cap_first}))
+		lengthInBits += uint64(${helper.toSerializationExpression(arrayField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)}) * uint64(len(m.${arrayField.name?cap_first}))
 				<#elseif arrayElementType.isSimpleTypeReference()>
                     <#assign simpleTypeReference = arrayElementType.asSimpleTypeReference().orElseThrow()>
-		lengthInBits += ${simpleTypeReference.sizeInBits} * uint16(len(m.${arrayField.name?cap_first}))
+		lengthInBits += ${simpleTypeReference.sizeInBits} * uint64(len(m.${arrayField.name?cap_first}))
 				<#else>
 				<#if arrayField.isCountArrayField()>
 		for _curItem, element := range m.${arrayField.name?cap_first} {
@@ -700,7 +703,7 @@ func (m *_${type.name}) GetLengthInBits(ctx context.Context) uint16 {
 	// Const Field (${constField.name})
 				<#if constField.type.isVstringTypeReference()>
 					<#assign vstringTypeReference = constField.type.asVstringTypeReference().orElseThrow()>
-	lengthInBits += uint16(${helper.toSerializationExpression(constField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)})
+	lengthInBits += uint64(${helper.toSerializationExpression(constField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)})
 				<#else>
                     <#assign simpleTypeReference = constField.type.asSimpleTypeReference().orElseThrow()>
 	lengthInBits += ${simpleTypeReference.sizeInBits}
@@ -713,7 +716,7 @@ func (m *_${type.name}) GetLengthInBits(ctx context.Context) uint16 {
             <#assign simpleTypeReference = discriminatorField.type.asSimpleTypeReference().orElseThrow()>
 			<#if discriminatorField.type.isVstringTypeReference()>
                 <#assign vstringTypeReference = discriminatorField.type.asVstringTypeReference().orElseThrow()>
-			lengthInBits += uint16(${helper.toSerializationExpression(discriminatorField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)})
+			lengthInBits += uint64(${helper.toSerializationExpression(discriminatorField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)})
 			<#else>
 			lengthInBits += ${simpleTypeReference.sizeInBits};
 			</#if>
@@ -741,13 +744,13 @@ func (m *_${type.name}) GetLengthInBits(ctx context.Context) uint16 {
 	                <#assign arrayElementType = manualArrayField.type.elementTypeReference>
 
 	// Manual Array Field (${manualArrayField.name})
-	lengthInBits += uint16(${helper.toSerializationExpression(manualArrayField, helper.intTypeReference, manualArrayField.lengthExpression, parserArguments)})
+	lengthInBits += uint64(${helper.toSerializationExpression(manualArrayField, helper.intTypeReference, manualArrayField.lengthExpression, parserArguments)})
 					<#break>
 				<#case "manual">
 					<#assign manualField = field.asManualField().orElseThrow()>
 
 	// Manual Field (${manualField.name})
-	lengthInBits += uint16(${helper.toSerializationExpression(manualField, helper.intTypeReference, manualField.lengthExpression, parserArguments)})
+	lengthInBits += uint64(${helper.toSerializationExpression(manualField, helper.intTypeReference, manualField.lengthExpression, parserArguments)})
 					<#break>
 				<#case "optional">
 					<#assign optionalField = field.asOptionalField().orElseThrow()>
@@ -792,7 +795,7 @@ func (m *_${type.name}) GetLengthInBits(ctx context.Context) uint16 {
 					<#if simpleField.type.isSimpleTypeReference()>
 						<#if simpleField.type.isVstringTypeReference()>
 							<#assign vstringTypeReference = simpleField.type.asVstringTypeReference().orElseThrow()>
-	lengthInBits += uint16(${helper.toSerializationExpression(simpleField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)})
+	lengthInBits += uint64(${helper.toSerializationExpression(simpleField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)})
 						<#else>
 							<#assign simpleTypeReference = simpleField.type.asSimpleTypeReference().orElseThrow()>
 	lengthInBits += ${simpleTypeReference.sizeInBits};
@@ -830,11 +833,11 @@ func (m *_${type.name}) GetLengthInBits(ctx context.Context) uint16 {
 </#if>
 
 <#if type.isDiscriminatedParentTypeDefinition()>
-func (m *_${type.name}) getLengthInBits(ctx context.Context) uint16 {
+func (m *_${type.name}) getLengthInBits(ctx context.Context) uint64 {
 	<#if type.parentType.isPresent()>
-	lengthInBits := uint16(m.${type.getParentType().orElseThrow().name}Contract.(*_${type.getParentType().orElseThrow().name}).getLengthInBits(ctx))
+	lengthInBits := uint64(m.${type.getParentType().orElseThrow().name}Contract.(*_${type.getParentType().orElseThrow().name}).getLengthInBits(ctx))
 	<#else>
-	lengthInBits := uint16(0)
+	lengthInBits := uint64(0)
 	</#if>
 	<#list type.fields as field>
 		<#switch field.typeName>
@@ -846,10 +849,10 @@ func (m *_${type.name}) getLengthInBits(ctx context.Context) uint16 {
 	if len(m.${arrayField.name?cap_first}) > 0 {
 				<#if arrayElementType.isVstringTypeReference()>
 					<#assign vstringTypeReference=arrayElementType.asVstringTypeReference().orElseThrow()>
-		lengthInBits += uint16(${helper.toSerializationExpression(arrayField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)}) * uint16(len(m.${arrayField.name?cap_first}))
+		lengthInBits += uint64(${helper.toSerializationExpression(arrayField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)}) * uint64(len(m.${arrayField.name?cap_first}))
 				<#elseif arrayElementType.isSimpleTypeReference()>
                     <#assign simpleTypeReference = arrayElementType.asSimpleTypeReference().orElseThrow()>
-		lengthInBits += ${simpleTypeReference.sizeInBits} * uint16(len(m.${arrayField.name?cap_first}))
+		lengthInBits += ${simpleTypeReference.sizeInBits} * uint64(len(m.${arrayField.name?cap_first}))
 				<#else>
 					<#if arrayField.isCountArrayField()>
 		for _curItem, element := range m.${arrayField.name?cap_first} {
@@ -877,7 +880,7 @@ func (m *_${type.name}) getLengthInBits(ctx context.Context) uint16 {
 	// Const Field (${constField.name})
 				<#if constField.type.isVstringTypeReference()>
                     <#assign vstringTypeReference = constField.type.asVstringTypeReference().orElseThrow()>
-					lengthInBits += uint16(${helper.toSerializationExpression(constField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)})
+					lengthInBits += uint64(${helper.toSerializationExpression(constField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)})
 				<#elseif constField.type.isEnumTypeReference()>
 	lengthInBits += ${helper.getEnumBaseTypeReference(constField.type).sizeInBits};
 				<#else>
@@ -891,7 +894,7 @@ func (m *_${type.name}) getLengthInBits(ctx context.Context) uint16 {
 				<#if simpleTypeReference.isSimpleTypeReference()>
 					<#if discriminatorField.type.isVstringTypeReference()>
                         <#assign vstringTypeReference = discriminatorField.type.asVstringTypeReference().orElseThrow()>
-	lengthInBits += uint16(${helper.toSerializationExpression(discriminatorField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)})
+	lengthInBits += uint64(${helper.toSerializationExpression(discriminatorField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)})
 					<#else>
 	lengthInBits += ${simpleTypeReference.asSimpleTypeReference().orElseThrow().sizeInBits};
 					</#if>
@@ -919,13 +922,13 @@ func (m *_${type.name}) getLengthInBits(ctx context.Context) uint16 {
 	            <#assign arrayElementType = manualArrayField.type.elementTypeReference>
 
 	// Manual Array Field (${manualArrayField.name})
-	lengthInBits += uint16(${helper.toParseExpression(manualArrayField, arrayElementType, manualArrayField.lengthExpression, parserArguments)})
+	lengthInBits += uint64(${helper.toParseExpression(manualArrayField, arrayElementType, manualArrayField.lengthExpression, parserArguments)})
 				<#break>
 			<#case "manual">
 				<#assign manualField = field.asManualField().orElseThrow()>
 
 	// Manual Field (${manualField.name})
-	lengthInBits += uint16(${helper.toParseExpression(manualField, manualField.type, manualField.lengthExpression, parserArguments)})
+	lengthInBits += uint64(${helper.toParseExpression(manualField, manualField.type, manualField.lengthExpression, parserArguments)})
 				<#break>
 			<#case "optional">
 				<#assign optionalField = field.asOptionalField().orElseThrow()>
@@ -968,7 +971,7 @@ func (m *_${type.name}) getLengthInBits(ctx context.Context) uint16 {
 				<#if simpleField.type.isSimpleTypeReference()>
 					<#if simpleField.type.isVstringTypeReference()>
 						<#assign vstringTypeReference = simpleField.type.asVstringTypeReference().orElseThrow()>
-	lengthInBits += uint16(${helper.toSerializationExpression(simpleField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)})
+	lengthInBits += uint64(${helper.toSerializationExpression(simpleField, helper.intTypeReference, vstringTypeReference.lengthExpression, parserArguments)})
 					<#else>
 						<#assign simpleTypeReference = simpleField.type.asSimpleTypeReference().orElseThrow()>
 	lengthInBits += ${simpleTypeReference.sizeInBits};
@@ -998,12 +1001,12 @@ func (m *_${type.name}) getLengthInBits(ctx context.Context) uint16 {
 	return lengthInBits
 }
 
-func (m *_${type.name}) GetLengthInBits(ctx context.Context) uint16 {
+func (m *_${type.name}) GetLengthInBits(ctx context.Context) uint64 {
 	return m._SubType.GetLengthInBits(ctx)
 }
 </#if>
 
-func (m *_${type.name}) GetLengthInBytes(ctx context.Context) uint16 {
+func (m *_${type.name}) GetLengthInBytes(ctx context.Context) uint64 {
 	return m.<#if type.isDiscriminatedParentTypeDefinition()>_SubType.</#if>GetLengthInBits(ctx) / 8
 }
 
@@ -1308,7 +1311,11 @@ func (m *_${type.name}) parse(ctx context.Context, readBuffer utils.ReadBuffer<#
 						</#if>: // ${case.name}
                     </@compress>
 
-		if _child, err = new(_${case.name}).parse(ctx, readBuffer, m<#if case.allParserArguments.isPresent()>, <#list case.allParserArguments.orElseThrow() as parserArgument><#if <#--TODO: here DF1ResponseMessage throws a payloadLength not present: meaning that some feature is not rightfully implemented as the result should be a error not a missing pointer-->type.getPropertyFieldFromThisOrParentByName(parserArgument.name).isPresent() && type.getPropertyFieldFromThisOrParentByName(parserArgument.name).orElseThrow().isOptionalField()>*</#if>${parserArgument.name}<#sep>, </#sep></#list></#if>); err != nil {
+		if _child, err = new(_${case.name}).parse(ctx, readBuffer, m<#if case.allParserArguments.isPresent()>, <#list case.allParserArguments.orElseThrow() as parserArgument><#if <#--TODO: here DF1ResponseMessage throws a payloadLength not present: meaning that some feature is not rightfully implemented as the result should be a error not a missing pointer-->type.getPropertyFieldFromThisOrParentByName(parserArgument.name).isPresent() && type.getPropertyFieldFromThisOrParentByName(parserArgument.name).orElseThrow().isOptionalField()>*${parserArgument.name}<#elseif parserArgument.type.isIntegerTypeReference()><#--
+    Go has no implicit numeric conversion, so an argument whose declared width differs from the
+    value being passed (e.g. a uint8 field bound to a uint16 parser argument) will not compile.
+    Converting to the declared type is a no-op when the widths already agree.
+-->${helper.getLanguageTypeNameForTypeReference(parserArgument.type)}(${parserArgument.name})<#else>${parserArgument.name}</#if><#sep>, </#sep></#list></#if>); err != nil {
 			return nil, errors.Wrap(err, "Error parsing sub-type ${case.name} for type-switch of ${type.name}")<@emitImport import="github.com/apache/plc4x/plc4go/spi/errors" />
 		}
 				</#list>

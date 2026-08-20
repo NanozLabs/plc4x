@@ -29,10 +29,8 @@ import org.apache.plc4x.java.eip.base.configuration.EIPConfiguration;
 import org.apache.plc4x.java.eip.base.tag.EipTag;
 import org.apache.plc4x.java.eip.base.tag.EipTagHandler;
 import org.apache.plc4x.java.eip.readwrite.*;
-import org.apache.plc4x.java.spi.buffers.api.WithOption;
 import org.apache.plc4x.java.spi.buffers.api.exceptions.BufferException;
 import org.apache.plc4x.java.spi.buffers.bytebased.ReadBufferByteBased;
-import org.apache.plc4x.java.spi.buffers.bytebased.WithByteBasedOption;
 import org.apache.plc4x.java.spi.buffers.bytebased.WriteBufferByteBased;
 import org.apache.plc4x.java.utils.subscriptionemulation.PollingSubscriptionConnectionBase;
 import org.apache.plc4x.java.spi.drivers.exceptions.MessageCodecException;
@@ -93,7 +91,7 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
     private final NullAddressItem nullAddressItem = new NullAddressItem();
     private final List<PathSegment> routingAddress = new ArrayList<>();
     private short connectionPathSize = 0;
-    private final int connectionSerialNumber = ThreadLocalRandom.current().nextInt();
+    private final int connectionSerialNumber;
 
     public EipTcpConnection(EIPConfiguration configuration, TransportInstance<?> transportInstance, AuditLog auditLog) {
         this(configuration, transportInstance, auditLog, configuration.isBigEndian());
@@ -102,6 +100,11 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
     public EipTcpConnection(EIPConfiguration configuration, TransportInstance<?> transportInstance, AuditLog auditLog, boolean bigEndian) {
         super(configuration, transportInstance, auditLog);
         this.bigEndian = bigEndian;
+        // CIP wants the Forward_Open serial number unique per connection, so it is random unless
+        // the user pins it (which recorded driver tests need in order to stay reproducible).
+        this.connectionSerialNumber = configuration.getConnectionSerialNumber() > 0
+            ? configuration.getConnectionSerialNumber()
+            : ThreadLocalRandom.current().nextInt(1, 0x10000);
         initRoutingAddress();
     }
 
@@ -222,7 +225,7 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
             this.sessionHandle = sessionResponse.getSessionHandle();
             LOGGER.debug("Got assigned with Session handle {}", sessionHandle);
 
-            // 3) GetAttributeAll on the message router to probe capabilities.
+            // 3) Probe connection-manager and message-router capabilities.
             //    Skipped when the user has already committed to the unconnected
             //    path — the probe is only useful for choosing between the
             //    connection-manager and message-router code paths, and some
@@ -231,7 +234,7 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
             if (getConfiguration().isForceUnconnectedOperation()) {
                 return CompletableFuture.completedFuture(null);
             }
-            return probeAttributes().thenCompose(v -> {
+            return probeClassObjectSupport().thenCompose(v -> {
                 if (useConnectionManager) {
                     return openConnectionManager();
                 }
@@ -240,8 +243,9 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
         });
     }
 
-    private CompletableFuture<Void> probeAttributes() {
-        PathSegment classSegment = new LogicalSegment(new ClassID((byte) 0, (short) 2));
+    // Using this method to continue having the GetAttributeAll that can be useful in the future
+    private CompletableFuture<Void> checkClassObjectAttributes(CIPClassID classId) {
+        PathSegment classSegment = new LogicalSegment(new ClassID((byte) 0, (short) classId.getValue()));
         PathSegment instanceSegment = new LogicalSegment(new InstanceID((byte) 0, (short) 1));
         UnConnectedDataItem exchange = new UnConnectedDataItem(
             new GetAttributeAllRequest(classSegment, instanceSegment));
@@ -250,40 +254,71 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
             DEFAULT_SENDER_CONTEXT, 0L, EMPTY_INTERFACE_HANDLE, 0, typeIds);
 
         return sendRequest(eipWrapper).thenAccept(response -> {
-            if (!(response instanceof CipRRData rr) || rr.getStatus() != CIPStatus.Success.getValue()) {
-                return;
+
+            if (extractCipService(response) instanceof GetAttributeAllResponse gar &&
+                gar.getStatus() == CIPStatus.Success.getValue() &&
+                gar.getAttributes() != null) {
+                LOGGER.debug("Identity getNumberActive {}", gar.getAttributes().getNumberActive());
             }
-            UnConnectedDataItem dataItem = (UnConnectedDataItem) rr.getTypeIds().get(1);
-            if (!(dataItem.getService() instanceof GetAttributeAllResponse gar)) {
-                return;
-            }
-            if (gar.getStatus() == CIPStatus.ServiceNotSupported.getValue()) {
-                return;
-            }
-            if (gar.getAttributes() != null) {
-                for (Integer classId : gar.getAttributes().getClassId()) {
-                    if (CIPClassID.enumForValue(classId) == CIPClassID.MessageRouter) {
-                        this.useMessageRouter = true;
-                    }
-                    if (CIPClassID.enumForValue(classId) == CIPClassID.ConnectionManager) {
-                        this.useConnectionManager = true;
-                    }
-                }
-            }
+        });
+    }
+
+    private CipService extractCipService(EipPacket response) {
+        if (response instanceof CipRRData rr
+            && rr.getStatus() == CIPStatus.Success.getValue()
+            && rr.getTypeIds().size() > 1
+            && rr.getTypeIds().get(1) instanceof UnConnectedDataItem di) {
+            return di.getService();
+        }
+        return null;
+    }
+
+    private CompletableFuture<Void> probeClassObjectSupport() {
+
+        return checkClassObjectSupport(CIPClassID.ConnectionManager).thenCompose(hasSupport -> {
+            useConnectionManager = hasSupport;
+            return checkClassObjectSupport(CIPClassID.MessageRouter);
+        }).thenCompose(hasSupport -> {
+            useMessageRouter = hasSupport;
+            return checkClassObjectAttributes(CIPClassID.Identity);
         }).exceptionally(e -> {
             // Treat any probe failure (timeout, parse error, malformed response,
-            // ServiceNotSupported) as "device has no message router / connection
-            // manager" and fall through to the unconnected code path. This keeps
+            // ServiceNotSupported) as the state that was achieved. This keeps
             // the handshake working against non-Logix devices and simulators.
-            LOGGER.debug("GetAttributeAll probe failed, falling back to unconnected mode", e);
+            LOGGER.debug("probeClassObjectSupport probe failed, keeping the state achieved", e);
             return null;
+        });
+    }
+
+    private CompletableFuture<Boolean> checkClassObjectSupport(CIPClassID classId) {
+        UnConnectedDataItem exchange = new UnConnectedDataItem(new GetAttributeSingleRequest(
+            new LogicalSegment(new ClassID((byte) 0, (short) classId.getValue())),
+            new LogicalSegment(new InstanceID((byte) 0, (short) 0)), // Class level discovery
+            new LogicalSegment(new AttributeID((byte) 0, (short) 1))) // Attribute ID 1: Revision
+        );
+        List<TypeId> typeIds = Arrays.asList(nullAddressItem, exchange);
+        CipRRData eipWrapper = new CipRRData(sessionHandle, CIPStatus.Success.getValue(),
+            DEFAULT_SENDER_CONTEXT, 0L, EMPTY_INTERFACE_HANDLE, 0, typeIds);
+
+        return sendRequest(eipWrapper).thenCompose(response -> {
+
+            // Every CIP response carries the general status in the header shared by all of them,
+            // so the concrete response type is irrelevant here: a device that answers a
+            // class-level Get_Attribute_Single with some other response still tells us whether
+            // the class exists.
+            if (extractCipService(response) instanceof CipServiceResponse resp) {
+                boolean hasSupport = resp.getStatus() == CIPStatus.Success.getValue();
+                LOGGER.debug("ClassId: {} status: {} hasSupport: {}", classId, resp.getStatus(), hasSupport);
+                return CompletableFuture.completedFuture(hasSupport);
+            }
+            return CompletableFuture.completedFuture(false);
         });
     }
 
     private CompletableFuture<Void> openConnectionManager() {
         UnConnectedDataItem exchange = new UnConnectedDataItem(
             new CipConnectionManagerRequest(
-                new LogicalSegment(new ClassID((byte) 0, (short) 6)),
+                new LogicalSegment(new ClassID((byte) 0, (short) CIPClassID.ConnectionManager.getValue())),
                 new LogicalSegment(new InstanceID((byte) 0, (short) 1)),
                 (byte) 0, (byte) 10, (short) 14, 536870914L, 33944L,
                 this.connectionSerialNumber, 4919, 42L, (short) 3, 2101812L,
@@ -301,9 +336,16 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
                 throw new PlcRuntimeException("Got status code while opening Connection Manager [" + response.getStatus() + "]");
             }
             UnConnectedDataItem dataItem = (UnConnectedDataItem) rr.getTypeIds().get(1);
-            if (dataItem.getService() instanceof CipConnectionManagerResponse cmr) {
+            // A rejected Forward_Open replies in CIP's shorter "unsuccessful" format, which the
+            // model now describes as its own type, so the reply's type tells us the outcome and
+            // only the successful one actually carries a connection id.
+            if (dataItem.getService() instanceof CipConnectionManagerResponseSuccess cmr) {
                 this.connectionId = cmr.getOtConnectionId();
                 LOGGER.debug("Got assigned with Connection Id {}", this.connectionId);
+            } else if (dataItem.getService() instanceof CipConnectionManagerResponseFailure failure) {
+                throw new PlcRuntimeException("Device rejected the Forward_Open [status "
+                    + failure.getStatus() + ", extended status " + failure.getExtStatus()
+                    + ", remaining connection path " + failure.getRemainingPathSize() + " words]");
             }
         });
     }
@@ -435,10 +477,18 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
         List<CompletableFuture<Void>> tagFutures = new ArrayList<>();
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
         for (String tagName : request.getTagNames()) {
+            // A tag whose address the builder couldn't parse is kept in the request with an
+            // error code and a null tag - report that code instead of sending a request built
+            // from it.
+            PlcResponseCode requestCode = request.getTagResponseCode(tagName);
+            if (requestCode != PlcResponseCode.OK) {
+                values.put(tagName, new DefaultPlcResponseItem<>(requestCode, null));
+                continue;
+            }
             EipTag eipTag = (EipTag) request.getTag(tagName);
             CompletableFuture<Void> tagFuture = chain.thenComposeAsync(v -> executeThrottled(() -> {
                 try {
-                    CipReadRequest req = new CipReadRequest(toAnsi(eipTag.getTag()), 1);
+                    CipReadRequest req = new CipReadRequest(toAnsi(eipTag.getTag()), elementCount(eipTag));
                     CipUnconnectedRequest requestItem = new CipUnconnectedRequest(
                         classSegment, instanceSegment, req,
                         (byte) getConfiguration().getBackplane(),
@@ -486,10 +536,10 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
         PathSegment instanceSegment = new LogicalSegment(new InstanceID((byte) 0, (short) 1));
 
         List<CipService> requests = new ArrayList<>(request.getNumberOfTags());
-        for (PlcTag field : request.getTags()) {
-            EipTag eipTag = (EipTag) field;
+        for (String tagName : sendableTagNames(request)) {
+            EipTag eipTag = (EipTag) request.getTag(tagName);
             try {
-                requests.add(new CipReadRequest(toAnsi(eipTag.getTag()), 1));
+                requests.add(new CipReadRequest(toAnsi(eipTag.getTag()), elementCount(eipTag)));
             } catch (BufferException e) {
                 return CompletableFuture.failedFuture(new PlcRuntimeException("Failed to read field", e));
             }
@@ -529,10 +579,10 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
     private CompletableFuture<PlcReadResponse> readWithConnectionManager(PlcReadRequest readRequest) {
         DefaultPlcReadRequest request = (DefaultPlcReadRequest) readRequest;
         List<CipService> requests = new ArrayList<>(request.getNumberOfTags());
-        for (PlcTag field : request.getTags()) {
-            EipTag eipTag = (EipTag) field;
+        for (String tagName : sendableTagNames(request)) {
+            EipTag eipTag = (EipTag) request.getTag(tagName);
             try {
-                requests.add(new CipReadRequest(toAnsi(eipTag.getTag()), 1));
+                requests.add(new CipReadRequest(toAnsi(eipTag.getTag()), elementCount(eipTag)));
             } catch (BufferException e) {
                 return CompletableFuture.failedFuture(new PlcRuntimeException("Failed to read field", e));
             }
@@ -566,9 +616,50 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
         }));
     }
 
+    /**
+     * The tag names that can actually be put on the wire. A tag whose address the builder
+     * couldn't parse stays in the request with an error code and a {@code null} tag; it must
+     * neither be sent nor occupy a slot in the response, which is mapped back to tags by
+     * position. Request building and response decoding both filter through this method so the
+     * two stay aligned.
+     */
+    private static List<String> sendableTagNames(PlcTagRequest request) {
+        List<String> names = new ArrayList<>(request.getNumberOfTags());
+        for (String tagName : request.getTagNames()) {
+            if (request.getTagResponseCode(tagName) == PlcResponseCode.OK) {
+                names.add(tagName);
+            }
+        }
+        return names;
+    }
+
+    /** Response items for the tags the builder rejected, keyed by name. */
+    private static Map<String, PlcResponseItem<PlcValue>> rejectedReadTags(PlcTagRequest request) {
+        Map<String, PlcResponseItem<PlcValue>> rejected = new LinkedHashMap<>();
+        for (String tagName : request.getTagNames()) {
+            PlcResponseCode code = request.getTagResponseCode(tagName);
+            if (code != PlcResponseCode.OK) {
+                rejected.put(tagName, new DefaultPlcResponseItem<>(code, null));
+            }
+        }
+        return rejected;
+    }
+
+    /** Response codes for the tags the builder rejected, keyed by name. */
+    private static Map<String, PlcResponseCode> rejectedWriteTags(PlcTagRequest request) {
+        Map<String, PlcResponseCode> rejected = new LinkedHashMap<>();
+        for (String tagName : request.getTagNames()) {
+            PlcResponseCode code = request.getTagResponseCode(tagName);
+            if (code != PlcResponseCode.OK) {
+                rejected.put(tagName, code);
+            }
+        }
+        return rejected;
+    }
+
     private Map<String, PlcResponseItem<PlcValue>> errorMap(DefaultPlcReadRequest request) {
-        Map<String, PlcResponseItem<PlcValue>> values = new LinkedHashMap<>();
-        for (String tn : request.getTagNames()) {
+        Map<String, PlcResponseItem<PlcValue>> values = new LinkedHashMap<>(rejectedReadTags(request));
+        for (String tn : sendableTagNames(request)) {
             values.put(tn, new DefaultPlcResponseItem<>(PlcResponseCode.INTERNAL_ERROR, null));
         }
         return values;
@@ -593,11 +684,11 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
         DefaultPlcWriteRequest request = (DefaultPlcWriteRequest) writeRequest;
         PathSegment classSegment = new LogicalSegment(new ClassID((byte) 0, (short) 6));
         PathSegment instanceSegment = new LogicalSegment(new InstanceID((byte) 0, (short) 1));
-        Map<String, PlcResponseCode> values = new ConcurrentHashMap<>();
 
         List<CompletableFuture<Void>> tagFutures = new ArrayList<>();
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
-        for (String fieldName : request.getTagNames()) {
+        Map<String, PlcResponseCode> values = new ConcurrentHashMap<>(rejectedWriteTags(request));
+        for (String fieldName : sendableTagNames(request)) {
             EipTag field = (EipTag) request.getTag(fieldName);
             PlcValue value = request.getPlcValue(fieldName);
             int elements = Math.max(field.getElementNb(), 1);
@@ -647,7 +738,7 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
     private CompletableFuture<PlcWriteResponse> writeWithoutConnectionManager(PlcWriteRequest writeRequest) {
         DefaultPlcWriteRequest request = (DefaultPlcWriteRequest) writeRequest;
         List<CipWriteRequest> items = new ArrayList<>(writeRequest.getNumberOfTags());
-        for (String fieldName : request.getTagNames()) {
+        for (String fieldName : sendableTagNames(request)) {
             EipTag field = (EipTag) request.getTag(fieldName);
             PlcValue value = request.getPlcValue(fieldName);
             int elements = Math.max(field.getElementNb(), 1);
@@ -696,7 +787,7 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
     private CompletableFuture<PlcWriteResponse> writeWithConnectionManager(PlcWriteRequest writeRequest) {
         DefaultPlcWriteRequest request = (DefaultPlcWriteRequest) writeRequest;
         List<CipWriteRequest> items = new ArrayList<>(writeRequest.getNumberOfTags());
-        for (String fieldName : request.getTagNames()) {
+        for (String fieldName : sendableTagNames(request)) {
             EipTag field = (EipTag) request.getTag(fieldName);
             PlcValue value = request.getPlcValue(fieldName);
             int elements = Math.max(field.getElementNb(), 1);
@@ -738,8 +829,8 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
     }
 
     private Map<String, PlcResponseCode> writeErrorMap(DefaultPlcWriteRequest request) {
-        Map<String, PlcResponseCode> values = new LinkedHashMap<>();
-        for (String tn : request.getTagNames()) {
+        Map<String, PlcResponseCode> values = new LinkedHashMap<>(rejectedWriteTags(request));
+        for (String tn : sendableTagNames(request)) {
             values.put(tn, PlcResponseCode.INTERNAL_ERROR);
         }
         return values;
@@ -749,7 +840,7 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
     // Encoders / decoders
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    private static byte[] toAnsi(String tag) throws BufferException {
+    private byte[] toAnsi(String tag) throws BufferException {
         Pattern resourcePattern = Pattern.compile("([.\\[\\]])*([A-Za-z_0-9]+)");
         Matcher matcher = resourcePattern.matcher(tag);
         List<PathSegment> segments = new LinkedList<>();
@@ -767,12 +858,7 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
             segments.add(newSegment);
             lengthBytes += newSegment.getLengthInBytes();
         }
-        WriteBufferByteBased buffer = new WriteBufferByteBased(new byte[lengthBytes],
-            WithByteBasedOption.WithByteOrder("LITTLE_ENDIAN"),
-            WithOption.WithUnsignedIntegerEncoding("unsigned-binary"),
-            WithOption.WithSignedIntegerEncoding("twos-complement"),
-            WithOption.WithFloatEncoding("IEEE754"),
-            WithOption.WithStringEncoding("UTF8"));
+        WriteBufferByteBased buffer = messageCodec.createWriteBuffer(lengthBytes);
         for (PathSegment segment : segments) {
             segment.serialize(buffer);
         }
@@ -780,14 +866,21 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
     }
 
     private PlcReadResponse decodeReadResponse(CipService p, PlcReadRequest readRequest) {
-        Map<String, PlcResponseItem<PlcValue>> values = new LinkedHashMap<>();
+        Map<String, PlcResponseItem<PlcValue>> values = new LinkedHashMap<>(rejectedReadTags(readRequest));
+        List<String> sendable = sendableTagNames(readRequest);
         if (p instanceof CipReadResponse resp) {
-            String tagName = readRequest.getTagNames().getFirst();
+            if (sendable.isEmpty()) {
+                return new DefaultPlcReadResponse((DefaultPlcReadRequest) readRequest, values);
+            }
+            String tagName = sendable.getFirst();
             EipTag tag = (EipTag) readRequest.getTag(tagName);
             PlcResponseCode code = decodeResponseCode(resp.getStatus());
             PlcValue plcValue = null;
             if (code == PlcResponseCode.OK) {
                 plcValue = parsePlcValue(tag, resp.getData().getData(), resp.getData().getDataType());
+                if (plcValue == null) {
+                    code = PlcResponseCode.INTERNAL_ERROR;
+                }
             }
             values.put(tagName, new DefaultPlcResponseItem<>(code, plcValue));
         } else if (p instanceof MultipleServiceResponse responses) {
@@ -795,8 +888,7 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
             List<CipService> arr = new ArrayList<>(nb);
             try {
                 byte[] servicesData = responses.getServicesData();
-                ReadBufferByteBased read = new ReadBufferByteBased(servicesData,
-                    WithByteBasedOption.WithByteOrder("LITTLE_ENDIAN"));
+                ReadBufferByteBased read = messageCodec.createReadBuffer(servicesData);
                 int total = servicesData.length;
                 for (int i = 0; i < nb; i++) {
                     int offset = responses.getOffsets().get(i) - responses.getOffsets().getFirst();
@@ -811,7 +903,7 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
             } catch (BufferException e) {
                 throw new PlcRuntimeException(e);
             }
-            Iterator<String> it = readRequest.getTagNames().iterator();
+            Iterator<String> it = sendable.iterator();
             for (int i = 0; i < nb && it.hasNext(); i++) {
                 String tagName = it.next();
                 EipTag tag = (EipTag) readRequest.getTag(tagName);
@@ -820,6 +912,9 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
                     PlcValue plcValue = null;
                     if (code == PlcResponseCode.OK) {
                         plcValue = parsePlcValue(tag, rr.getData().getData(), rr.getData().getDataType());
+                        if (plcValue == null) {
+                            code = PlcResponseCode.INTERNAL_ERROR;
+                        }
                     }
                     values.put(tagName, new DefaultPlcResponseItem<>(code, plcValue));
                 }
@@ -838,17 +933,49 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
         PlcValue plcValue = null;
         if (code == PlcResponseCode.OK) {
             plcValue = parsePlcValue((EipTag) tag, resp.getData().getData(), resp.getData().getDataType());
+            if (plcValue == null) {
+                // Undecodable payload (unsupported type or a reply shorter than the requested
+                // number of elements) - don't report that as a successful read.
+                code = PlcResponseCode.INTERNAL_ERROR;
+            }
         }
         values.put(tagName, new DefaultPlcResponseItem<>(code, plcValue));
         return values;
     }
 
-    private PlcValue parsePlcValue(EipTag tag, byte[] rawData, CIPDataTypeCode type) {
+    /**
+     * Number of elements to ask the device for. An array tag ({@code %tag[0]:DINT:8}) has to
+     * request all of its elements - see GH-1008 - otherwise the device returns a single element
+     * and the decoder below has nothing to read the remaining ones from.
+     */
+    private static int elementCount(EipTag tag) {
+        return Math.max(tag.getElementNb(), 1);
+    }
+
+    /** Whether the type is stored as a flat sequence of equally sized elements. */
+    private static boolean isFixedSize(CIPDataTypeCode type) {
+        return switch (type) {
+            case SINT, INT, DINT, LINT, REAL, LREAL, BOOL -> true;
+            default -> false;
+        };
+    }
+
+    // Package-private and static so the decoding can be tested without a connection.
+    static PlcValue parsePlcValue(EipTag tag, byte[] rawData, CIPDataTypeCode type) {
         final int STRING_LEN_OFFSET = 2;
         final int STRING_DATA_OFFSET = 6;
         ByteBuffer data = ByteBuffer.wrap(rawData).order(ByteOrder.LITTLE_ENDIAN);
-        int nb = tag.getElementNb();
+        int nb = elementCount(tag);
         if (nb > 1) {
+            // Never read past what the device actually sent - a short reply must not blow up
+            // the whole response with an IndexOutOfBoundsException. Only the fixed-size types
+            // below are laid out element by element; STRING/STRUCTURED carry their own length.
+            int elementSize = isFixedSize(type) ? type.getSize() : 0;
+            if (elementSize > 0 && rawData.length < nb * elementSize) {
+                LOGGER.warn("Device returned {} bytes for tag '{}', expected {} for {} elements of {}.",
+                    rawData.length, tag.getTag(), nb * elementSize, nb, type);
+                return null;
+            }
             List<PlcValue> list = new ArrayList<>();
             int index = 0;
             for (int i = 0; i < nb; i++) {
@@ -924,9 +1051,13 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
     }
 
     private PlcWriteResponse decodeWriteResponse(CipService p, PlcWriteRequest writeRequest) {
-        Map<String, PlcResponseCode> responses = new LinkedHashMap<>();
+        Map<String, PlcResponseCode> responses = new LinkedHashMap<>(rejectedWriteTags(writeRequest));
+        List<String> sendable = sendableTagNames(writeRequest);
         if (p instanceof CipWriteResponse resp) {
-            String fieldName = writeRequest.getTagNames().getFirst();
+            if (sendable.isEmpty()) {
+                return new DefaultPlcWriteResponse((DefaultPlcWriteRequest) writeRequest, responses);
+            }
+            String fieldName = sendable.getFirst();
             responses.put(fieldName, decodeResponseCode(resp.getStatus()));
             return new DefaultPlcWriteResponse(writeRequest, responses);
         } else if (p instanceof MultipleServiceResponse resp) {
@@ -934,8 +1065,7 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
             List<CipService> arr = new ArrayList<>(nb);
             try {
                 byte[] servicesData = resp.getServicesData();
-                ReadBufferByteBased read = new ReadBufferByteBased(servicesData,
-                    WithByteBasedOption.WithByteOrder("LITTLE_ENDIAN"));
+                ReadBufferByteBased read = messageCodec.createReadBuffer(servicesData);
                 int total = servicesData.length;
                 for (int i = 0; i < nb; i++) {
                     int offset = resp.getOffsets().get(i);
@@ -950,7 +1080,7 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
             } catch (BufferException e) {
                 throw new PlcRuntimeException(e);
             }
-            Iterator<String> it = writeRequest.getTagNames().iterator();
+            Iterator<String> it = sendable.iterator();
             for (int i = 0; i < nb && it.hasNext(); i++) {
                 String fieldName = it.next();
                 if (arr.get(i) instanceof CipWriteResponse writeResponse) {
@@ -959,7 +1089,7 @@ public class EipTcpConnection extends PollingSubscriptionConnectionBase<EIPConfi
             }
             return new DefaultPlcWriteResponse(writeRequest, responses);
         }
-        for (String tn : writeRequest.getTagNames()) {
+        for (String tn : sendable) {
             responses.put(tn, PlcResponseCode.INTERNAL_ERROR);
         }
         return new DefaultPlcWriteResponse(writeRequest, responses);
