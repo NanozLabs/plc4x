@@ -26,10 +26,7 @@ import org.apache.plc4x.java.dlt645.tag.Dlt645Tag;
 import org.apache.plc4x.java.spi.config.Configuration;
 import org.apache.plc4x.java.spi.drivers.ConnectionBase;
 import org.apache.plc4x.java.spi.drivers.DriverBase;
-import org.apache.plc4x.java.spi.transports.api.Transport;
 import org.apache.plc4x.java.spi.transports.api.TransportInstance;
-import org.apache.plc4x.java.transport.serial.SerialTransport;
-import org.apache.plc4x.java.transport.tcp.TcpTransport;
 import org.apache.plc4x.java.utils.auditlog.api.AuditLog;
 
 import java.util.Arrays;
