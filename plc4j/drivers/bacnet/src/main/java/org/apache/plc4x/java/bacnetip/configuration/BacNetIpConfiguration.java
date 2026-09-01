@@ -21,6 +21,7 @@ package org.apache.plc4x.java.bacnetip.configuration;
 import org.apache.plc4x.java.spi.config.Configuration;
 import org.apache.plc4x.java.spi.config.annotations.ConfigurationParameter;
 import org.apache.plc4x.java.spi.config.annotations.Description;
+import org.apache.plc4x.java.spi.config.annotations.defaults.IntDefaultValue;
 
 import java.io.File;
 
@@ -33,6 +34,11 @@ public class BacNetIpConfiguration implements Configuration {
     @ConfigurationParameter("ede-directory-path")
     @Description("Path to the directory used for storing multiple EDE files. These files contain the descriptors for the possible target devices.")
     private File edeDirectory;
+
+    @ConfigurationParameter("apdu-timeout")
+    @IntDefaultValue(3000)
+    @Description("Per-request timeout in milliseconds waiting for a ComplexACK / SimpleACK / Error.")
+    private int apduTimeout = 3000;
 
     public File getEdeFile() {
         return edeFile;
@@ -48,6 +54,14 @@ public class BacNetIpConfiguration implements Configuration {
 
     public void setEdeDirectory(File edeDirectory) {
         this.edeDirectory = edeDirectory;
+    }
+
+    public int getApduTimeout() {
+        return apduTimeout;
+    }
+
+    public void setApduTimeout(int apduTimeout) {
+        this.apduTimeout = apduTimeout;
     }
 
 }

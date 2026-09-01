@@ -29,15 +29,22 @@ image::users/protocols/bacnet_banner.png[banner,512,167]
 
 == Supported Operations
 
-IMPORTANT: This driver is a *passive listener*. It supports subscriptions only - reading, writing
-and browsing are not implemented and a request for any of them is rejected.
+The Java driver is an *active BACnet/IP client* for unicast ReadProperty /
+ReadPropertyMultiple / WriteProperty against the UDP peer in the connection
+string. Subscriptions still passively report COV notifications observed on
+the socket (they are not SubscribeCOV).
 
-The driver joins the network and reports the change-of-value (COV) notifications it observes. There
-is no handshake with a device and no request/response exchange.
+Tag addresses follow the plc4go form:
 
-Tag addresses are not interpreted yet, so a subscription cannot be narrowed to a single object -
-every registered consumer receives all COV notifications seen on the network, and has to filter
-them itself.
+----
+ANALOG_INPUT,1/PRESENT_VALUE
+ANALOG_VALUE,10/PRESENT_VALUE{8}
+BINARY_INPUT,1/PRESENT_VALUE
+DEVICE,12001/OBJECT_LIST
+----
+
+`{priority}` is the BACnet write priority (1..16). `[index]` is an optional
+array index. Multiple properties on one object may be joined with `&`.
 
 == Connection String Options
 

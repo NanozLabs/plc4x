@@ -18,8 +18,6 @@
  */
 package org.apache.plc4x.java.dlt645.context;
 
-import org.apache.plc4x.java.dlt645.readwrite.utils.StaticHelper;
-
 /**
  * DL/T 645-2007 helper utilities for the driver.
  * <p>
@@ -28,38 +26,69 @@ import org.apache.plc4x.java.dlt645.readwrite.utils.StaticHelper;
  */
 public final class Dlt645DriverContext {
 
+    /** Broadcast address {@code 99 99 99 99 99 99H} (DL/T 645-2007 §5.2.2). */
+    public static final byte[] BROADCAST_ADDRESS = {
+        (byte) 0x99, (byte) 0x99, (byte) 0x99,
+        (byte) 0x99, (byte) 0x99, (byte) 0x99
+    };
+
     private Dlt645DriverContext() {
         // Utility class
+    }
+
+    /**
+     * True when the 6-byte wire address is the all-{@code 99H} broadcast address.
+     */
+    public static boolean isBroadcastAddress(byte[] address) {
+        if (address == null || address.length != 6) {
+            return false;
+        }
+        for (byte b : address) {
+            if ((b & 0xFF) != 0x99) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Pad a printed 1–12 digit BCD address to 12 digits. Validates the same way as
+     * {@link #parseMeterAddress(String)}.
+     */
+    public static String formatPrintedAddress(String addressStr) {
+        parseMeterAddress(addressStr);
+        return String.format("%12s", addressStr).replace(' ', '0');
     }
 
     /**
      * Parse 12-hex-digit meter address string into 6-byte array in wire order.
      * <p>
      * DL/T 645-2007 Section 4.2: Address field is 6 bytes BCD, transmitted
-     * A0 (low byte) first, A5 (high byte) last, and each byte is transmitted
-     * with its bit order reversed (低位在前). The input string is in
+     * A0 (low byte) first and A5 (high byte) last. UART bit order is handled
+     * by the physical transport and must not be applied to the address bytes.
+     * The input string is in
      * human-readable order (MSB first, as printed on the meter label).
      * <p>
-     * Example: "123456789012" → wire bytes [0x48, 0x09, 0x1E, 0x6A, 0x2C, 0x48]
-     * (byte order reversed AND each byte bit-reversed).
+     * Example: "123456789012" -> wire bytes [0x12, 0x90, 0x78, 0x56, 0x34, 0x12].
      */
     public static byte[] parseMeterAddress(String addressStr) {
         if (addressStr == null || addressStr.isEmpty()) {
-            return new byte[]{(byte) 0x99, (byte) 0x99, (byte) 0x99,
-                (byte) 0x99, (byte) 0x99, (byte) 0x99};
+            throw new IllegalArgumentException("DL/T 645 meter address is required");
         }
-        // Pad to 12 hex digits
+        if (!addressStr.matches("[0-9]{1,12}")) {
+            throw new IllegalArgumentException("DL/T 645 meter address must contain 1 to 12 BCD digits");
+        }
+        // Pad shorter printed addresses to 12 BCD digits.
         var padded = String.format("%12s", addressStr).replace(' ', '0');
         var bytes = new byte[6];
         for (int i = 0; i < 6; i++) {
             bytes[i] = (byte) Integer.parseInt(padded.substring(i * 2, i * 2 + 2), 16);
         }
-        // Reverse to DL/T 645-2007 wire order: A0 (low byte) first, then
-        // bit-reverse each byte (低位在前 per 6.1.2).
+        // Reverse to DL/T 645-2007 wire order: A0 (low byte) first.
         for (int i = 0; i < 3; i++) {
             byte tmp = bytes[i];
-            bytes[i] = StaticHelper.bitReverse(bytes[5 - i]);
-            bytes[5 - i] = StaticHelper.bitReverse(tmp);
+            bytes[i] = bytes[5 - i];
+            bytes[5 - i] = tmp;
         }
         return bytes;
     }

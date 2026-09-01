@@ -81,7 +81,7 @@ public class ModbusRtuDriver extends DriverBase {
 
     @Override
     public List<String> getSupportedTransportCodes() {
-        return List.of("serial", "tcp", "tls", "tls-psk", "udp", "test");
+        return List.of("serial", "tcp", "tls", "tls-psk", "udp", "socket", "test");
     }
 
     @Override

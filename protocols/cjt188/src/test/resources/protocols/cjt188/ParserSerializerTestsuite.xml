@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+      https://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+  -->
+<test:testsuite xmlns:test="https://plc4x.apache.org/schemas/parser-serializer-testsuite.xsd"
+                byteOrder="BIG_ENDIAN">
+
+  <name>CJ/T 188-2004</name>
+
+  <protocolName>cjt188</protocolName>
+  <outputFlavor>read-write</outputFlavor>
+
+  <!-- Test 1: Read Data Request
+       Address: 11223344556677 (7 bytes), Control: 0x01 (READ_DATA), Length: 3
+       DataPlain: 000000 -> Wire: 333333
+       CS = 0x68+0x11+0x22+0x33+0x44+0x55+0x66+0x77+0x68+0x01+0x03+0x33+0x33+0x33
+          = 841 mod 256 = 73 = 0x49 -->
+  <testcase>
+    <name>Read Data Request (+33H decode and checksum)</name>
+    <raw>68112233445566776801033333334916</raw>
+    <root-type>Cjt188Frame</root-type>
+    <parser-arguments>
+      <response>false</response>
+    </parser-arguments>
+    <xml>
+      <Cjt188Frame>
+        <start1 dataType="uint" bitLength="8">104</start1>
+        <address dataType="byte" bitLength="56">0x11223344556677</address>
+        <start2 dataType="uint" bitLength="8">104</start2>
+        <control dataType="uint" bitLength="8" stringRepresentation="READ_DATA">1</control>
+        <length dataType="uint" bitLength="8">3</length>
+        <dataPlain dataType="byte" bitLength="24">0x000000</dataPlain>
+        <cs dataType="uint" bitLength="8">73</cs>
+        <end dataType="uint" bitLength="8">22</end>
+      </Cjt188Frame>
+    </xml>
+  </testcase>
+
+  <!-- Test 2: Read Data Response
+       Address: 11223344556677, Control: 0x81 (READ_DATA_RESPONSE), Length: 7
+       DataPlain: 1F900056341200 -> Wire: 52C33389674533
+       CS = 0xE4 -->
+  <testcase>
+    <name>Read Data Response (+33H decode and checksum)</name>
+    <raw>681122334455667768810752C33389674533E416</raw>
+    <root-type>Cjt188Frame</root-type>
+    <parser-arguments>
+      <response>true</response>
+    </parser-arguments>
+    <xml>
+      <Cjt188Frame>
+        <start1 dataType="uint" bitLength="8">104</start1>
+        <address dataType="byte" bitLength="56">0x11223344556677</address>
+        <start2 dataType="uint" bitLength="8">104</start2>
+        <control dataType="uint" bitLength="8" stringRepresentation="READ_DATA_RESPONSE">129</control>
+        <length dataType="uint" bitLength="8">7</length>
+        <dataPlain dataType="byte" bitLength="56">0x1F900056341200</dataPlain>
+        <cs dataType="uint" bitLength="8">228</cs>
+        <end dataType="uint" bitLength="8">22</end>
+      </Cjt188Frame>
+    </xml>
+  </testcase>
+
+  <!-- Test 3: Write Data Request
+       Address: 11223344556677, Control: 0x04 (WRITE_DATA), Length: 4
+       DataPlain: 17A00099 -> Wire: 4AD333CC
+       CS = 0xD0 -->
+  <testcase>
+    <name>Write Data Request (+33H encode/decode)</name>
+    <raw>68112233445566776804044AD333CCD016</raw>
+    <root-type>Cjt188Frame</root-type>
+    <parser-arguments>
+      <response>false</response>
+    </parser-arguments>
+    <xml>
+      <Cjt188Frame>
+        <start1 dataType="uint" bitLength="8">104</start1>
+        <address dataType="byte" bitLength="56">0x11223344556677</address>
+        <start2 dataType="uint" bitLength="8">104</start2>
+        <control dataType="uint" bitLength="8" stringRepresentation="WRITE_DATA">4</control>
+        <length dataType="uint" bitLength="8">4</length>
+        <dataPlain dataType="byte" bitLength="32">0x17A00099</dataPlain>
+        <cs dataType="uint" bitLength="8">208</cs>
+        <end dataType="uint" bitLength="8">22</end>
+      </Cjt188Frame>
+    </xml>
+  </testcase>
+
+  <!-- Test 4: Empty data (read address request, CJ/T 188-2004 L=0, no SER)
+       Address: AAAAAAAAAAAAAA, Control: 0x03, Length: 0
+       CS = 0x68+0xAA*7+0x68+0x03+0x00
+          = 104+1190+104+3+0 = 1401
+          1401 mod 256 = 121 = 0x79 -->
+  <testcase>
+    <name>Read Address Request - empty data</name>
+    <raw>68AAAAAAAAAAAAAA6803007916</raw>
+    <root-type>Cjt188Frame</root-type>
+    <parser-arguments>
+      <response>false</response>
+    </parser-arguments>
+    <xml>
+      <Cjt188Frame>
+        <start1 dataType="uint" bitLength="8">104</start1>
+        <address dataType="byte" bitLength="56">0xAAAAAAAAAAAAAA</address>
+        <start2 dataType="uint" bitLength="8">104</start2>
+        <control dataType="uint" bitLength="8" stringRepresentation="READ_ADDRESS">3</control>
+        <length dataType="uint" bitLength="8">0</length>
+        <dataPlain dataType="byte" bitLength="0">0x</dataPlain>
+        <cs dataType="uint" bitLength="8">121</cs>
+        <end dataType="uint" bitLength="8">22</end>
+      </Cjt188Frame>
+    </xml>
+  </testcase>
+
+  <!-- Test 5: 0xFF plain byte wraps on +0x33
+       Address: 11223344556677, Control: 0x01, Length: 1
+       DataPlain: FF -> Wire: 32
+       CS = 0xE0 -->
+  <testcase>
+    <name>Read Data Request - Length 1 Boundary (0xFF plain)</name>
+    <raw>681122334455667768010132E016</raw>
+    <root-type>Cjt188Frame</root-type>
+    <parser-arguments>
+      <response>false</response>
+    </parser-arguments>
+    <xml>
+      <Cjt188Frame>
+        <start1 dataType="uint" bitLength="8">104</start1>
+        <address dataType="byte" bitLength="56">0x11223344556677</address>
+        <start2 dataType="uint" bitLength="8">104</start2>
+        <control dataType="uint" bitLength="8" stringRepresentation="READ_DATA">1</control>
+        <length dataType="uint" bitLength="8">1</length>
+        <dataPlain dataType="byte" bitLength="8">0xFF</dataPlain>
+        <cs dataType="uint" bitLength="8">224</cs>
+        <end dataType="uint" bitLength="8">22</end>
+      </Cjt188Frame>
+    </xml>
+  </testcase>
+
+</test:testsuite>

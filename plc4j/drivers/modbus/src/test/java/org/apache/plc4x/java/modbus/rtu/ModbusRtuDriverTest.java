@@ -53,6 +53,7 @@ class ModbusRtuDriverTest {
         assertTrue(metadata.getSupportedTransportCodes().contains("tcp"));
         assertTrue(metadata.getSupportedTransportCodes().contains("serial"));
         assertTrue(metadata.getSupportedTransportCodes().contains("test"));
+        assertTrue(metadata.getSupportedTransportCodes().contains("socket"));
     }
 
     @Test

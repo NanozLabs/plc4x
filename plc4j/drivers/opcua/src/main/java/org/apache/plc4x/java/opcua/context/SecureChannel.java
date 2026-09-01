@@ -548,6 +548,12 @@ public class SecureChannel {
         } else if (configuration.getEndpointPort() != null) {
             return isMatchingEndpoint(endpointDescription, driverContext.getHost(), configuration.getEndpointPort().toString(), driverContext.getTransportEndpoint());
         }
+        // discovery=false: TCP is already the intended connection. Servers behind NAT/NodePort
+        // advertise an unreachable host/port (e.g. opc.tcp://0.0.0.0:4840/path while the client
+        // dialed 1.2.3.4:15001). Still accept the endpoint when the path matches.
+        if (!configuration.isDiscovery()) {
+            return isMatchingEndpointPath(endpointDescription, driverContext.getTransportEndpoint());
+        }
         return false;
     }
 
@@ -569,6 +575,17 @@ public class SecureChannel {
         // to match a connection string that says "myserver".
         return endpoint.getEndpointUrl().getStringValue().toLowerCase(Locale.ROOT)
             .startsWith(expected.toLowerCase(Locale.ROOT));
+    }
+
+    private static boolean isMatchingEndpointPath(EndpointDescription endpoint, String transportEndpoint) {
+        String url = endpoint.getEndpointUrl().getStringValue();
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+        if (transportEndpoint == null || transportEndpoint.isBlank() || "/".equals(transportEndpoint)) {
+            return true;
+        }
+        return url.toLowerCase(Locale.ROOT).contains(transportEndpoint.toLowerCase(Locale.ROOT));
     }
 
     /**

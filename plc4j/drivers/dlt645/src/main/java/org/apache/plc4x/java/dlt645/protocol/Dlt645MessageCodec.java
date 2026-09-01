@@ -21,6 +21,7 @@ package org.apache.plc4x.java.dlt645.protocol;
 import org.apache.plc4x.java.dlt645.readwrite.Dlt645Frame;
 import org.apache.plc4x.java.spi.buffers.api.exceptions.BufferException;
 import org.apache.plc4x.java.spi.buffers.bytebased.ReadBufferByteBased;
+import org.apache.plc4x.java.spi.buffers.bytebased.WriteBufferByteBased;
 import org.apache.plc4x.java.spi.drivers.MessageCodecBase;
 import org.apache.plc4x.java.spi.drivers.exceptions.MessageCodecException;
 import org.apache.plc4x.java.spi.transports.api.TransportInstance;
@@ -44,11 +45,36 @@ public class Dlt645MessageCodec extends MessageCodecBase<Dlt645Frame> {
     private static final int HEADER_SIZE = 10;
     // 0x68 + addr + 0x68 + control + length + cs + 0x16 fixed overhead
     private static final int FIXED_FRAME_OVERHEAD = 12;
+    private static final int FRAME_START = 0x68;
+    private static final int MAX_DATA_LENGTH = 200;
+    private static final int PREAMBLE_LENGTH = 4;
 
+    private final Object receiveLock = new Object();
     private long resyncSkippedBytes;
 
     public Dlt645MessageCodec(TransportInstance<?> transportInstance, Consumer<Dlt645Frame> messageHandler) {
         super("DL/T 645", transportInstance, messageHandler);
+    }
+
+    /**
+     * Drop every currently buffered byte. Used after a timeout or before dispatching
+     * the next request: DL/T 645 has no transaction id, so a late 91H for the same
+     * DI would otherwise complete the next future with a stale value.
+     */
+    public void discardBufferedInput(String reason) {
+        synchronized (receiveLock) {
+            try {
+                int available = getTransportInstance().getNumBytesAvailable();
+                if (available <= 0) {
+                    return;
+                }
+                getTransportInstance().read(available);
+                resyncSkippedBytes = 0;
+                logger.warn("Discarded {} leftover DL/T 645 byte(s) ({})", available, reason);
+            } catch (TransportException e) {
+                logger.warn("Failed to discard leftover DL/T 645 bytes ({})", reason, e);
+            }
+        }
     }
 
     @Override
@@ -70,6 +96,22 @@ public class Dlt645MessageCodec extends MessageCodecBase<Dlt645Frame> {
         return Dlt645Frame.staticParse(readBuffer, true);
     }
 
+    @Override
+    public void send(Dlt645Frame message) throws MessageCodecException {
+        try {
+            WriteBufferByteBased writeBuffer = createWriteBuffer(message.getLengthInBytes());
+            message.serialize(writeBuffer);
+            byte[] frame = writeBuffer.getBytes();
+            byte[] wireBytes = new byte[PREAMBLE_LENGTH + frame.length];
+            java.util.Arrays.fill(wireBytes, 0, PREAMBLE_LENGTH, (byte) 0xFE);
+            System.arraycopy(frame, 0, wireBytes, PREAMBLE_LENGTH, frame.length);
+            fireMessageExchange(true, message);
+            getTransportInstance().write(wireBytes);
+        } catch (BufferException | TransportException e) {
+            throw new MessageCodecException("Failed to send DL/T 645 message", e);
+        }
+    }
+
     /**
      * DL/T 645 receive loop: peek before consume. A frame is only consumed after
      * the generated parser (which validates the CS checksum field) accepted it from
@@ -79,30 +121,37 @@ public class Dlt645MessageCodec extends MessageCodecBase<Dlt645Frame> {
     public void processIncomingData() throws MessageCodecException {
         try {
             while (true) {
-                int availableBytes = getTransportInstance().getNumBytesAvailable();
-                if (availableBytes < HEADER_SIZE) {
-                    return;
-                }
-                byte[] header = getTransportInstance().peekReadableBytes(HEADER_SIZE);
-                int expectedSize = calculateTotalMessageSize(header, availableBytes);
-                if (availableBytes < expectedSize) {
-                    if (resyncSkippedBytes > 0) {
-                        skipOneByte("candidate frame during resync needs " + expectedSize
-                            + " bytes, only " + availableBytes + " available");
+                Dlt645Frame message;
+                synchronized (receiveLock) {
+                    int availableBytes = getTransportInstance().getNumBytesAvailable();
+                    if (availableBytes < HEADER_SIZE) {
+                        return;
+                    }
+                    byte[] header = getTransportInstance().peekReadableBytes(HEADER_SIZE);
+                    if ((header[0] & 0xFF) != FRAME_START || (header[7] & 0xFF) != FRAME_START) {
+                        skipOneByte("candidate does not contain aligned 0x68 start bytes");
                         continue;
                     }
-                    return; // never consume a partial frame
+                    int expectedSize = calculateTotalMessageSize(header, availableBytes);
+                    if (expectedSize > FIXED_FRAME_OVERHEAD + MAX_DATA_LENGTH) {
+                        skipOneByte("data length exceeds the DL/T 645 maximum of 200 bytes");
+                        continue;
+                    }
+                    if (availableBytes < expectedSize) {
+                        return; // never consume a partial frame
+                    }
+                    byte[] frameBytes = getTransportInstance().peekReadableBytes(expectedSize);
+                    try {
+                        message = parseMessage(createReadBuffer(frameBytes));
+                    } catch (BufferException | RuntimeException e) {
+                        skipOneByte("frame failed validation: " + e.getMessage());
+                        continue;
+                    }
+                    getTransportInstance().read(expectedSize); // consume the validated frame
+                    noteResyncComplete();
                 }
-                byte[] frameBytes = getTransportInstance().peekReadableBytes(expectedSize);
-                Dlt645Frame message;
-                try {
-                    message = parseMessage(createReadBuffer(frameBytes));
-                } catch (BufferException e) {
-                    skipOneByte("frame failed validation: " + e.getMessage());
-                    continue;
-                }
-                getTransportInstance().read(expectedSize); // consume the validated frame
-                noteResyncComplete();
+                // Release receiveLock before the handler so a subsequent send/discard
+                // on this thread (thenCompose) cannot deadlock.
                 messageHandler.accept(message);
             }
         } catch (TransportException e) {

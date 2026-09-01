@@ -19,6 +19,7 @@
 package org.apache.plc4x.java.dlt645.readwrite.utils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,6 +35,15 @@ import java.util.Map;
  */
 public final class DataIdentifiers {
 
+    public enum DataFormat {
+        BCD,
+        SIGNED_BCD,
+        DATE_TIME,
+        DATE,
+        TIME,
+        RAW
+    }
+
     private DataIdentifiers() {
         // Utility class
     }
@@ -47,14 +57,21 @@ public final class DataIdentifiers {
         private final String unit;
         private final int dataLength;
         private final int decimalPlaces;
+        private final DataFormat format;
 
         public DataItemDescriptor(String di, String name, String unit,
                                   int dataLength, int decimalPlaces) {
+            this(di, name, unit, dataLength, decimalPlaces, DataFormat.BCD);
+        }
+
+        public DataItemDescriptor(String di, String name, String unit,
+                                  int dataLength, int decimalPlaces, DataFormat format) {
             this.di = di;
             this.name = name;
             this.unit = unit;
             this.dataLength = dataLength;
             this.decimalPlaces = decimalPlaces;
+            this.format = format;
         }
 
         public String getDi() { return di; }
@@ -62,6 +79,7 @@ public final class DataIdentifiers {
         public String getUnit() { return unit; }
         public int getDataLength() { return dataLength; }
         public int getDecimalPlaces() { return decimalPlaces; }
+        public DataFormat getFormat() { return format; }
 
         @Override
         public String toString() {
@@ -159,33 +177,33 @@ public final class DataIdentifiers {
         reg(map, "02010300", "C-phase voltage", "V", 2, 1);
 
         // 02 02: Current (A), XXX.XXX, 3 bytes BCD, 3 decimal
-        reg(map, "02020100", "A-phase current", "A", 3, 3);
-        reg(map, "02020200", "B-phase current", "A", 3, 3);
-        reg(map, "02020300", "C-phase current", "A", 3, 3);
+        regSigned(map, "02020100", "A-phase current", "A", 3, 3);
+        regSigned(map, "02020200", "B-phase current", "A", 3, 3);
+        regSigned(map, "02020300", "C-phase current", "A", 3, 3);
 
         // 02 03: Active power (kW), XX.XXXX, 3 bytes BCD, 4 decimal
-        reg(map, "02030000", "Total active power", "kW", 3, 4);
-        reg(map, "02030100", "A-phase active power", "kW", 3, 4);
-        reg(map, "02030200", "B-phase active power", "kW", 3, 4);
-        reg(map, "02030300", "C-phase active power", "kW", 3, 4);
+        regSigned(map, "02030000", "Total active power", "kW", 3, 4);
+        regSigned(map, "02030100", "A-phase active power", "kW", 3, 4);
+        regSigned(map, "02030200", "B-phase active power", "kW", 3, 4);
+        regSigned(map, "02030300", "C-phase active power", "kW", 3, 4);
 
         // 02 04: Reactive power (kvar), XX.XXXX, 3 bytes BCD, 4 decimal
-        reg(map, "02040000", "Total reactive power", "kvar", 3, 4);
-        reg(map, "02040100", "A-phase reactive power", "kvar", 3, 4);
-        reg(map, "02040200", "B-phase reactive power", "kvar", 3, 4);
-        reg(map, "02040300", "C-phase reactive power", "kvar", 3, 4);
+        regSigned(map, "02040000", "Total reactive power", "kvar", 3, 4);
+        regSigned(map, "02040100", "A-phase reactive power", "kvar", 3, 4);
+        regSigned(map, "02040200", "B-phase reactive power", "kvar", 3, 4);
+        regSigned(map, "02040300", "C-phase reactive power", "kvar", 3, 4);
 
         // 02 05: Apparent power (kVA), XX.XXXX, 3 bytes BCD, 4 decimal
-        reg(map, "02050000", "Total apparent power", "kVA", 3, 4);
-        reg(map, "02050100", "A-phase apparent power", "kVA", 3, 4);
-        reg(map, "02050200", "B-phase apparent power", "kVA", 3, 4);
-        reg(map, "02050300", "C-phase apparent power", "kVA", 3, 4);
+        regSigned(map, "02050000", "Total apparent power", "kVA", 3, 4);
+        regSigned(map, "02050100", "A-phase apparent power", "kVA", 3, 4);
+        regSigned(map, "02050200", "B-phase apparent power", "kVA", 3, 4);
+        regSigned(map, "02050300", "C-phase apparent power", "kVA", 3, 4);
 
         // 02 06: Power factor, X.XXX, 2 bytes BCD, 3 decimal
-        reg(map, "02060000", "Total power factor", "", 2, 3);
-        reg(map, "02060100", "A-phase power factor", "", 2, 3);
-        reg(map, "02060200", "B-phase power factor", "", 2, 3);
-        reg(map, "02060300", "C-phase power factor", "", 2, 3);
+        regSigned(map, "02060000", "Total power factor", "", 2, 3);
+        regSigned(map, "02060100", "A-phase power factor", "", 2, 3);
+        regSigned(map, "02060200", "B-phase power factor", "", 2, 3);
+        regSigned(map, "02060300", "C-phase power factor", "", 2, 3);
 
         // 02 07: Phase angle (°), XXX.X, 2 bytes BCD, 1 decimal
         reg(map, "02070100", "A-phase angle", "\u00B0", 2, 1);
@@ -193,19 +211,24 @@ public final class DataIdentifiers {
         reg(map, "02070300", "C-phase angle", "\u00B0", 2, 1);
 
         // 02 80: Other instantaneous variables
-        reg(map, "02800001", "Zero-line current", "A", 3, 3);
+        regSigned(map, "02800001", "Zero-line current", "A", 3, 3);
         reg(map, "02800002", "Grid frequency", "Hz", 2, 2);
-        reg(map, "02800003", "Phase-sequence indicator", "", 1, 0);
-        reg(map, "02800007", "Table internal temperature", "\u2103", 2, 1);
+        regSigned(map, "02800003", "One-minute total active average power", "kW", 3, 4);
+        regSigned(map, "02800004", "Current active demand", "kW", 3, 4);
+        regSigned(map, "02800005", "Current reactive demand", "kvar", 3, 4);
+        regSigned(map, "02800006", "Current apparent demand", "kVA", 3, 4);
+        regSigned(map, "02800007", "Table internal temperature", "\u2103", 2, 1);
         reg(map, "02800008", "Clock battery voltage", "V", 2, 2);
-        reg(map, "02800009", "Meter internal temperature", "\u2103", 2, 1);
+        reg(map, "02800009", "Meter-reading battery voltage", "V", 2, 2);
+        reg(map, "0280000A", "Internal battery operating time", "min", 4, 0);
+        reg(map, "0280000B", "Current tier electricity price", "currency/kWh", 4, 4);
 
         // ================================================================
         // DI3=04: Date/Time (Annex A, Table A.4)
         // ================================================================
-        reg(map, "04000101", "Date and time (YYMMDDWWhhmmss)", "", 7, 0);
-        reg(map, "04000102", "Date (YYMMDDWW)", "", 4, 0);
-        reg(map, "04000103", "Time (hhmmss)", "", 3, 0);
+        reg(map, "04000101", "Date and time (YYMMDDWWhhmmss)", "", 7, 0, DataFormat.DATE_TIME);
+        reg(map, "04000102", "Date (YYMMDDWW)", "", 4, 0, DataFormat.DATE);
+        reg(map, "04000103", "Time (hhmmss)", "", 3, 0, DataFormat.TIME);
 
         REGISTRY = Collections.unmodifiableMap(map);
     }
@@ -213,7 +236,20 @@ public final class DataIdentifiers {
     private static void reg(Map<String, DataItemDescriptor> map,
                             String di, String name, String unit,
                             int dataLength, int decimalPlaces) {
-        map.put(di.toUpperCase(), new DataItemDescriptor(di, name, unit, dataLength, decimalPlaces));
+        reg(map, di, name, unit, dataLength, decimalPlaces, DataFormat.BCD);
+    }
+
+    private static void regSigned(Map<String, DataItemDescriptor> map,
+                                  String di, String name, String unit,
+                                  int dataLength, int decimalPlaces) {
+        reg(map, di, name, unit, dataLength, decimalPlaces, DataFormat.SIGNED_BCD);
+    }
+
+    private static void reg(Map<String, DataItemDescriptor> map,
+                            String di, String name, String unit,
+                            int dataLength, int decimalPlaces, DataFormat format) {
+        map.put(di.toUpperCase(),
+            new DataItemDescriptor(di, name, unit, dataLength, decimalPlaces, format));
     }
 
     /**
@@ -392,6 +428,40 @@ public final class DataIdentifiers {
     }
 
     /**
+     * Whether an optimizer may auto-merge tags into this wildcard DI.
+     * <p>
+     * DL/T 645-2007 §6 allows FF in DI2 / DI1 / DI0, never in DI3. Auto-merge is
+     * further restricted to the industrially common blocks:
+     * <ul>
+     *   <li>DI1=FF — rates or phases of one quantity ({@code 0001FF00}, {@code 0201FF00})</li>
+     *   <li>DI0=FF and DI3=00 — settlement days of an energy item ({@code 000100FF})</li>
+     * </ul>
+     * Instantaneous (DI3=02) and parameter (DI3=04) DI0 wildcards such as
+     * {@code 028000FF} or {@code 040001FF} mix different lengths and meanings
+     * and must not be auto-merged. DI2=FF would mean "every quantity type"
+     * (for example {@code 00FF0000} for all energies), which many meters do
+     * not implement.
+     */
+    public static boolean isOptimizerSafeBlockDi(String wildcardDi) {
+        if (wildcardDi == null || wildcardDi.length() != 8 || !containsWildcard(wildcardDi)) {
+            return false;
+        }
+        var upper = wildcardDi.toUpperCase();
+        boolean di3 = "FF".equals(upper.substring(0, 2));
+        boolean di2 = "FF".equals(upper.substring(2, 4));
+        boolean di1 = "FF".equals(upper.substring(4, 6));
+        boolean di0 = "FF".equals(upper.substring(6, 8));
+        if (di3 || di2) {
+            return false;
+        }
+        if (di1 && !di0) {
+            return true;
+        }
+        // Settlement-day block: only energy (DI3=00).
+        return di0 && !di1 && "00".equals(upper.substring(0, 2));
+    }
+
+    /**
      * Find the index of a concrete DI within the sub-items of a wildcard DI.
      *
      * @param wildcardDi wildcard DI hex string (e.g. "0201FF00")
@@ -426,22 +496,31 @@ public final class DataIdentifiers {
             return 0.0;
         }
 
-        // Parse raw BCD integer
+        var descriptor = lookup(diHex);
+        if (descriptor != null && bcdData.length != descriptor.getDataLength()) {
+            throw new IllegalArgumentException("DI " + diHex + " expects " + descriptor.getDataLength()
+                + " data bytes, got " + bcdData.length);
+        }
+
+        boolean negative = descriptor != null && descriptor.getFormat() == DataFormat.SIGNED_BCD &&
+            (bcdData[bcdData.length - 1] & 0x80) != 0;
+        byte[] digits = Arrays.copyOf(bcdData, bcdData.length);
+        if (negative) {
+            digits[digits.length - 1] &= 0x7F;
+        }
+
         long rawValue = 0;
-        for (int i = bcdData.length - 1; i >= 0; i--) {
-            int high = (bcdData[i] >> 4) & 0x0F;
-            int low = bcdData[i] & 0x0F;
+        for (int i = digits.length - 1; i >= 0; i--) {
+            int high = (digits[i] >> 4) & 0x0F;
+            int low = digits[i] & 0x0F;
+            if (high > 9 || low > 9) {
+                throw new IllegalArgumentException("DI " + diHex + " contains invalid BCD data");
+            }
             rawValue = rawValue * 100 + high * 10 + low;
         }
 
-        var descriptor = lookup(diHex);
-        if (descriptor == null || descriptor.getDecimalPlaces() == 0) {
-            return (double) rawValue;
-        }
-
-        // Apply decimal scaling using double-precision lookup table
-        // decimalPlaces range: 1-4, so direct power-of-10 is safe
-        double divisor = Math.pow(10.0, descriptor.getDecimalPlaces());
-        return rawValue / divisor;
+        double value = descriptor == null || descriptor.getDecimalPlaces() == 0
+            ? rawValue : rawValue / Math.pow(10.0, descriptor.getDecimalPlaces());
+        return negative ? -value : value;
     }
 }

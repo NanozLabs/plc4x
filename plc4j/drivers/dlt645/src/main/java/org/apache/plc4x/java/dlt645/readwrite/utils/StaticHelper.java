@@ -40,20 +40,6 @@ public class StaticHelper {
     }
 
     /**
-     * Reverse the bit order of a byte (e.g. 0x12 -> 0x48).
-     * DL/T 645-2007 transmits address bytes 低位在前 (bit-reversed).
-     */
-    public static byte bitReverse(byte b) {
-        int v = b & 0xFF;
-        int r = 0;
-        for (int i = 0; i < 8; i++) {
-            r = (r << 1) | (v & 1);
-            v >>= 1;
-        }
-        return (byte) r;
-    }
-
-    /**
      * Checksum per DL/T 645-2007 Section 4.2:
      * CS = mod-256 sum of all bytes from first 0x68 to before CS.
      * Includes: start1(0x68) + address + start2(0x68) + control + length + wire data.
@@ -233,18 +219,16 @@ public class StaticHelper {
 
     /**
      * Extract and format error description from an error response's plain data.
-     * Per DL/T 645-2007, error response data = DI(4 bytes reversed) + ERR(1 byte).
+     * Per DL/T 645-2007, every abnormal response carries exactly one ERR byte.
      *
      * @param dataPlain decoded data field (after -0x33)
      * @return formatted error string, or empty string if data is too short
      */
     public static String describeError(byte[] dataPlain) {
-        if (dataPlain == null || dataPlain.length < 5) {
-            return dataPlain != null && dataPlain.length > 0
-                ? "Error (insufficient data, length=" + dataPlain.length + ")"
-                : "Error (no data)";
+        if (dataPlain == null || dataPlain.length != 1) {
+            return "Error (invalid ERR data length=" + (dataPlain == null ? 0 : dataPlain.length) + ")";
         }
-        byte errByte = dataPlain[4];
+        byte errByte = dataPlain[0];
         var errors = parseErrorCode(errByte);
         return "ERR=0x" + String.format("%02X", errByte & 0xFF)
             + " [" + String.join(", ", errors) + "]";

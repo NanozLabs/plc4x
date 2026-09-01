@@ -21,18 +21,21 @@ package org.apache.plc4x.java.dlt645.tag;
 import org.apache.plc4x.java.api.exceptions.PlcInvalidTagException;
 import org.apache.plc4x.java.api.model.PlcTag;
 import org.apache.plc4x.java.api.types.PlcValueType;
+import org.apache.plc4x.java.dlt645.context.Dlt645DriverContext;
 
+import java.util.Arrays;
 import java.util.regex.Pattern;
 
 /**
  * DL/T 645-2007 Command Tag for administrative operations.
  * <p>
- * Tag address format: {@code cmd:<command-name>}
+ * Tag address format: {@code [meter-address/]cmd:<command-name>}
  * <p>
  * Supported commands:
  * <ul>
  *   <li>{@code cmd:read-address} — Read meter communication address (0x13)</li>
  *   <li>{@code cmd:write-address} — Write meter communication address (0x15)</li>
+ *   <li>{@code cmd:broadcast-time-sync} — Broadcast clock synchronization (0x08)</li>
  *   <li>{@code cmd:freeze} — Freeze data command (0x16)</li>
  *   <li>{@code cmd:change-baud-rate} — Change baud rate (0x17)</li>
  *   <li>{@code cmd:change-password} — Change password (0x18)</li>
@@ -46,6 +49,7 @@ public class Dlt645CommandTag implements PlcTag {
     public enum CommandType {
         READ_ADDRESS("read-address", true),
         WRITE_ADDRESS("write-address", false),
+        BROADCAST_TIME_SYNC("broadcast-time-sync", false),
         FREEZE("freeze", false),
         CHANGE_BAUD_RATE("change-baud-rate", false),
         CHANGE_PASSWORD("change-password", false),
@@ -81,42 +85,67 @@ public class Dlt645CommandTag implements PlcTag {
     }
 
     public static final Pattern COMMAND_PATTERN =
-        Pattern.compile("^cmd:([a-z][a-z0-9-]*)$");
+        Pattern.compile("^(?:(?<meter>\\d{1,12})/)?cmd:(?<cmd>[a-z][a-z0-9-]*)$");
 
     private final CommandType commandType;
+    private final String meterAddress;
+    private final byte[] meterAddressBytes;
 
     public Dlt645CommandTag(CommandType commandType) {
+        this(commandType, null);
+    }
+
+    public Dlt645CommandTag(CommandType commandType, String meterAddress) {
         this.commandType = commandType;
+        if (meterAddress == null || meterAddress.isEmpty()) {
+            this.meterAddress = null;
+            this.meterAddressBytes = null;
+        } else {
+            this.meterAddress = Dlt645DriverContext.formatPrintedAddress(meterAddress);
+            this.meterAddressBytes = Dlt645DriverContext.parseMeterAddress(meterAddress);
+        }
     }
 
     public static boolean matches(String tagAddress) {
         if (tagAddress == null) return false;
         var matcher = COMMAND_PATTERN.matcher(tagAddress);
         if (!matcher.matches()) return false;
-        return CommandType.fromKeyword(matcher.group(1)) != null;
+        return CommandType.fromKeyword(matcher.group("cmd")) != null;
     }
 
     public static Dlt645CommandTag of(String tagAddress) {
         var matcher = COMMAND_PATTERN.matcher(tagAddress);
         if (!matcher.matches()) {
-            throw new PlcInvalidTagException(tagAddress, COMMAND_PATTERN, "cmd:<command-name>");
+            throw new PlcInvalidTagException(tagAddress, COMMAND_PATTERN, "[meter-address/]cmd:<command-name>");
         }
-        var cmdType = CommandType.fromKeyword(matcher.group(1));
+        var cmdType = CommandType.fromKeyword(matcher.group("cmd"));
         if (cmdType == null) {
             throw new PlcInvalidTagException(tagAddress, COMMAND_PATTERN,
-                "Unknown command. Supported: read-address, write-address, freeze, " +
+                "Unknown command. Supported: read-address, write-address, broadcast-time-sync, freeze, " +
                     "change-baud-rate, change-password, clear-max-demand, clear-meter, clear-event");
         }
-        return new Dlt645CommandTag(cmdType);
+        String meter = matcher.group("meter");
+        return new Dlt645CommandTag(cmdType, meter == null || meter.isEmpty() ? null : meter);
     }
 
     public CommandType getCommandType() {
         return commandType;
     }
 
+    public String getMeterAddress() {
+        return meterAddress;
+    }
+
+    public byte[] getMeterAddressBytes() {
+        return meterAddressBytes == null ? null : Arrays.copyOf(meterAddressBytes, meterAddressBytes.length);
+    }
+
     @Override
     public String getAddressString() {
-        return "cmd:" + commandType.getKeyword();
+        if (meterAddress == null) {
+            return "cmd:" + commandType.getKeyword();
+        }
+        return meterAddress + "/cmd:" + commandType.getKeyword();
     }
 
     @Override

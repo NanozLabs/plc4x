@@ -18,6 +18,9 @@
  */
 package org.apache.plc4x.java.dlt645;
 
+import org.apache.plc4x.java.api.PlcConnection;
+import org.apache.plc4x.java.api.authentication.PlcAuthentication;
+import org.apache.plc4x.java.api.exceptions.PlcConnectionException;
 import org.apache.plc4x.java.api.model.PlcTag;
 import org.apache.plc4x.java.dlt645.config.Dlt645Configuration;
 import org.apache.plc4x.java.dlt645.protocol.Dlt645Connection;
@@ -41,8 +44,9 @@ import java.util.Set;
  * <p>
  * Connection URI format:
  * <ul>
- *   <li>{@code dlt645:serial:///dev/ttyUSB0?meter-address=123456789012}</li>
- *   <li>{@code dlt645:tcp://192.168.1.100:8899?meter-address=123456789012}</li>
+ *   <li>{@code dlt645:serial:///dev/ttyUSB0} — shared bus; put the meter on the tag</li>
+ *   <li>{@code dlt645:serial:///dev/ttyUSB0?meter-address=123456789012} — single-meter default</li>
+ *   <li>{@code dlt645:tcp://192.168.1.100:8899}</li>
  * </ul>
  */
 public class Dlt645Driver extends DriverBase {
@@ -60,6 +64,43 @@ public class Dlt645Driver extends DriverBase {
     @Override
     protected Class<? extends Configuration> getConfigurationClass() {
         return Dlt645Configuration.class;
+    }
+
+    @Override
+    public PlcConnection getConnection(String connectionString) throws PlcConnectionException {
+        return getConnection(connectionString, null);
+    }
+
+    @Override
+    public PlcConnection getConnection(String connectionString, PlcAuthentication authentication)
+        throws PlcConnectionException {
+        return super.getConnection(withSerialDefaults(connectionString), authentication);
+    }
+
+    private static String withSerialDefaults(String connectionString) {
+        if (connectionString == null ||
+            !(connectionString.startsWith("dlt645:serial://") || connectionString.startsWith("dlt645://"))) {
+            return connectionString;
+        }
+        StringBuilder defaults = new StringBuilder();
+        appendDefault(defaults, connectionString, "serial.baud-rate", "2400");
+        appendDefault(defaults, connectionString, "serial.data-bits", "8");
+        appendDefault(defaults, connectionString, "serial.stop-bits", "1");
+        appendDefault(defaults, connectionString, "serial.parity", "even");
+        if (defaults.length() == 0) {
+            return connectionString;
+        }
+        return connectionString + (connectionString.contains("?") ? "&" : "?") + defaults;
+    }
+
+    private static void appendDefault(StringBuilder defaults, String connectionString, String name, String value) {
+        if (connectionString.matches(".*(?:[?&])" + java.util.regex.Pattern.quote(name) + "=[^&]*.*")) {
+            return;
+        }
+        if (defaults.length() > 0) {
+            defaults.append('&');
+        }
+        defaults.append(name).append('=').append(value);
     }
 
     @Override

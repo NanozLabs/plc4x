@@ -36,8 +36,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * Integration self-check: spins up a real {@code ServerSocket}, accepts a "DTU" client
  * connection, performs a (fake) registration handshake, then hands the accepted channel to
- * {@link SocketTransport#injectConnection} — exactly the user-owned listen/accept/register
- * flow the socket transport assumes. A {@code getConnection(url?did=X)} resolves the injected
+ * {@link SocketTransport#injectChannel} — exactly the user-owned listen/accept/register
+ * flow the socket transport assumes. A {@code getConnection(url?socket.did=X)} resolves the injected
  * channel and bytes flow both ways through the driver-side transport instance.
  *
  * <p>Run manually. Exits non-zero on failure.</p>
@@ -55,7 +55,7 @@ public class SocketTransportSelfCheck {
             CompletableFuture<SocketChannel> acceptedFuture = CompletableFuture.supplyAsync(() -> {
                 try {
                     // NOT try-with-resources: the accepted channel must survive past this lambda,
-                    // it is handed to SocketTransport.injectConnection below.
+                    // it is handed to SocketTransport.injectChannel below.
                     SocketChannel accepted = serverChannel.accept();
                     accepted.configureBlocking(true);
                     // Fake registration handshake: the user reads exactly 10 bytes then consumes them.
@@ -119,10 +119,9 @@ public class SocketTransportSelfCheck {
 
             // 3. Inject the accepted channel under the device id.
             SocketChannel channel = acceptedFuture.get(10, TimeUnit.SECONDS);
-            SocketTransport transport = new SocketTransport();
-            transport.injectConnection(deviceId, channel);
-            if (!transport.isDeviceRegistered(deviceId)) {
-                throw new AssertionError("device not registered after inject");
+            SocketTransport.injectChannel(deviceId, channel);
+            if (!SocketTransport.isChannelRegistered(deviceId)) {
+                throw new AssertionError("channel not registered after inject");
             }
 
             // 4. Resolve via a connection-string-like flow (did → config → createTransportInstance).
@@ -130,7 +129,7 @@ public class SocketTransportSelfCheck {
             SocketTransportConfiguration config = configFactory.createConfiguration(
                 SocketTransportConfiguration.class, "did=" + deviceId);
             TransportInstance<SocketTransportConfiguration> instance =
-                transport.createTransportInstance("socket://", config, AuditLog.builder().build());
+                new SocketTransport().createTransportInstance("socket://", config, AuditLog.builder().build());
 
             // 5. Write "ping", then drain the transport until the client's protocol frame
             //    (which may already be sitting in the ring buffer — a listener registered after

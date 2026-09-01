@@ -30,8 +30,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
+import java.net.NoRouteToHostException;
 import java.net.SocketAddress;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SocketChannel;
@@ -135,11 +139,47 @@ public class TcpTransportInstance extends BaseTransportInstance<TcpTransportConf
             }
             String errorMsg = String.format("Failed to connect to %s:%d - %s",
                 remoteAddress.getHostName(), remoteAddress.getPort(), e.getMessage());
-            LOGGER.error(errorMsg, e);
+            if (isSelfExplanatoryConnectFailure(e)) {
+                LOGGER.error(errorMsg);
+            } else {
+                LOGGER.error(errorMsg, e);
+            }
             // errorMsg already embeds e.getMessage(); a single audit event avoids a duplicate.
             auditLog.write(AuditLogEventType.ERROR, "Error in constructor: " + errorMsg);
             throw new TransportException(errorMsg, e);
         }
+    }
+
+    /**
+     * Connection refused / timeout / unreachable already say why in the message;
+     * dumping the JDK socket stack on every retry just floods the log.
+     */
+    private static boolean isSelfExplanatoryConnectFailure(Throwable throwable) {
+        Throwable cur = throwable;
+        while (cur != null) {
+            if (cur instanceof ConnectException
+                    || cur instanceof SocketTimeoutException
+                    || cur instanceof NoRouteToHostException
+                    || cur instanceof UnknownHostException) {
+                return true;
+            }
+            String msg = cur.getMessage();
+            if (msg != null) {
+                String lower = msg.toLowerCase();
+                if (lower.contains("connection refused")
+                        || lower.contains("connection timed out")
+                        || lower.contains("connect timed out")
+                        || lower.contains("no route to host")
+                        || lower.contains("network is unreachable")
+                        || lower.contains("host is unreachable")
+                        || lower.contains("connection reset")
+                        || lower.contains("broken pipe")) {
+                    return true;
+                }
+            }
+            cur = cur.getCause();
+        }
+        return false;
     }
 
     public InetSocketAddress getRemoteAddress() {

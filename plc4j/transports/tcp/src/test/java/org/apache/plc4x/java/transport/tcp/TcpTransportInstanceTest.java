@@ -89,6 +89,24 @@ class TcpTransportInstanceTest {
     }
 
     @Test
+    void selfExplanatoryConnectFailureDetectsKnownCauses() throws Exception {
+        var method = TcpTransportInstance.class.getDeclaredMethod("isSelfExplanatoryConnectFailure", Throwable.class);
+        method.setAccessible(true);
+        assertTrue((boolean) method.invoke(null, new java.net.ConnectException("Connection refused")));
+        assertTrue((boolean) method.invoke(null, new java.net.SocketTimeoutException("connect timed out")));
+        assertTrue((boolean) method.invoke(null, new java.net.NoRouteToHostException("No route to host")));
+        assertTrue((boolean) method.invoke(null, new java.net.UnknownHostException("unknown")));
+        assertTrue((boolean) method.invoke(null, new RuntimeException(new java.net.ConnectException("Connection refused"))));
+        assertTrue((boolean) method.invoke(null, new RuntimeException("network is unreachable")));
+        assertTrue((boolean) method.invoke(null, new RuntimeException("host is unreachable")));
+        assertTrue((boolean) method.invoke(null, new RuntimeException("connection reset")));
+        assertTrue((boolean) method.invoke(null, new RuntimeException("broken pipe")));
+        assertTrue((boolean) method.invoke(null, new RuntimeException("connection timed out")));
+        assertFalse((boolean) method.invoke(null, new IllegalStateException("buffer overflow")));
+        assertFalse((boolean) method.invoke(null, new RuntimeException((String) null)));
+    }
+
+    @Test
     void testGetConfiguration() {
         TcpTransportConfiguration config = transportInstance.getConfiguration();
         assertNotNull(config);

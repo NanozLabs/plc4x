@@ -21,7 +21,6 @@ package org.apache.plc4x.java.dlt645.config;
 import org.apache.plc4x.java.spi.config.Configuration;
 import org.apache.plc4x.java.spi.config.annotations.ConfigurationParameter;
 import org.apache.plc4x.java.spi.config.annotations.Description;
-import org.apache.plc4x.java.spi.config.annotations.defaults.IntDefaultValue;
 import org.apache.plc4x.java.spi.config.annotations.defaults.StringDefaultValue;
 
 public class Dlt645Configuration implements Configuration {
@@ -31,8 +30,8 @@ public class Dlt645Configuration implements Configuration {
     protected int requestTimeout = 5_000;
 
     @ConfigurationParameter("meter-address")
-    @StringDefaultValue("999999999999")
-    @Description("DL/T 645 meter address (12 hex digits, BCD encoded). Use 999999999999 for broadcast.")
+    @StringDefaultValue("")
+    @Description("Optional printed 12-digit BCD meter address used when a tag does not name a meter. Prefer putting the address on the tag (`123456789012/00010000`) so one connection can poll several meters on the same serial or TCP port. 999999999999 is broadcast.")
     private String meterAddress;
 
     @ConfigurationParameter("password")

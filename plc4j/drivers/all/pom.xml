@@ -102,6 +102,12 @@
     </dependency>
     <dependency>
       <groupId>org.apache.plc4x</groupId>
+      <artifactId>plc4j-driver-cjt188</artifactId>
+      <version>1.0.0-nanoz-SNAPSHOT</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.plc4x</groupId>
       <artifactId>plc4j-driver-can</artifactId>
       <version>1.0.0-nanoz-SNAPSHOT</version>
       <scope>runtime</scope>

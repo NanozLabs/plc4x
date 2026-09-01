@@ -296,6 +296,27 @@ public class Iec60870Connection extends ConnectionBase<Iec608705014Configuration
                     new Iec608705104SubscriptionHandle(this, (Iec608705104Tag) subscriptionTag.getTag())));
             }
         }
+
+        // SPI stores setConsumer(...) / per-tag consumers on the request but
+        // does not register them. Same wiring as KNX / simulated: IEC-104 has
+        // no per-tag subscribe on the wire, so this only attaches Java callbacks.
+        if (subscriptionRequest instanceof DefaultPlcSubscriptionRequest req) {
+            Consumer<PlcSubscriptionEvent> requestConsumer = req.getConsumer();
+            for (Map.Entry<String, PlcResponseItem<PlcSubscriptionHandle>> entry : values.entrySet()) {
+                if (entry.getValue().getResponseCode() != PlcResponseCode.OK) {
+                    continue;
+                }
+                PlcSubscriptionHandle handle = entry.getValue().getValue();
+                Consumer<PlcSubscriptionEvent> perTag = req.getTagConsumer(entry.getKey());
+                if (perTag != null) {
+                    handle.register(perTag);
+                }
+                if (requestConsumer != null) {
+                    handle.register(requestConsumer);
+                }
+            }
+        }
+
         return CompletableFuture.completedFuture(new DefaultPlcSubscriptionResponse(subscriptionRequest, values));
     }
 

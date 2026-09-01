@@ -42,8 +42,10 @@ public class Dlt645WildcardTag extends Dlt645Tag {
      * @param originalTagName the tag name in the original PlcReadRequest
      * @param subItemIndex    0-based index within the wildcard sub-items list
      * @param subItemDiHex    the concrete DI hex string (e.g. "02010200")
+     * @param requestedType   the original tag's {@link PlcValueType}, used when decoding
      */
-    public record SubTagMapping(String originalTagName, int subItemIndex, String subItemDiHex) {
+    public record SubTagMapping(String originalTagName, int subItemIndex, String subItemDiHex,
+                                PlcValueType requestedType) {
     }
 
     private final List<SubTagMapping> mappings;
@@ -53,7 +55,11 @@ public class Dlt645WildcardTag extends Dlt645Tag {
      * @param mappings   ordered mapping from original tag names to sub-item positions
      */
     public Dlt645WildcardTag(byte[] wildcardDi, List<SubTagMapping> mappings) {
-        super(wildcardDi, PlcValueType.Struct);
+        this(wildcardDi, mappings, null);
+    }
+
+    public Dlt645WildcardTag(byte[] wildcardDi, List<SubTagMapping> mappings, String meterAddress) {
+        super(wildcardDi, PlcValueType.Struct, meterAddress);
         this.mappings = Collections.unmodifiableList(mappings);
     }
 

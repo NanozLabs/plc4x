@@ -76,7 +76,7 @@ public class ModbusTcpDriver extends DriverBase {
 
     @Override
     public List<String> getSupportedTransportCodes() {
-        return List.of("tcp", "tls", "tls-psk", "udp", "test");
+        return List.of("tcp", "tls", "tls-psk", "udp", "socket", "test");
     }
 
     @Override

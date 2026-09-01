@@ -29,7 +29,7 @@ import org.apache.plc4x.java.spi.transports.api.config.TransportConfiguration;
  * <p>Each device connection is addressed by {@code did} (device id): the identifier the
  * user registered the injected {@link java.nio.channels.SocketChannel} under. The user owns
  * listen/accept/registration and hands plc4x an established channel per device; this transport
- * only wraps it and looks it up by {@code did}.</p>
+ * only wraps it and looks it up by {@code socket.did}.</p>
  */
 public class SocketTransportConfiguration implements TransportConfiguration {
 

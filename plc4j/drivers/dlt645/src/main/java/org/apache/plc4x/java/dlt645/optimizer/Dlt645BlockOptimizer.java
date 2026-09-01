@@ -46,7 +46,9 @@ import java.util.*;
  * <p>
  * Merges consecutive data identifier (DI) tag reads into wildcard (0xFF) block reads
  * per DL/T 645-2007 specification. Tags sharing the same DI prefix with only one byte
- * position varying are combined into a single wildcard request.
+ * position varying are combined into a single wildcard request, but only when the
+ * resulting DI is an optimizer-safe block ({@link DataIdentifiers#isOptimizerSafeBlockDi}):
+ * DI3 and DI2 must not be FF.
  * <p>
  * Example: reading A-phase voltage (02010100), B-phase voltage (02010200),
  * C-phase voltage (02010300) becomes one wildcard read of 0201FF00.
@@ -88,7 +90,7 @@ public class Dlt645BlockOptimizer {
 
         var subRequests = new ArrayList<PlcReadRequest>();
 
-        // Group DLT645 tags by potential wildcard prefix
+        // Group DLT645 tags by meter, then by potential wildcard prefix
         var groups = groupByWildcardPrefix(dlt645Tags);
 
         for (var group : groups) {
@@ -226,19 +228,36 @@ public class Dlt645BlockOptimizer {
     // ========== Grouping Logic ==========
 
     /**
-     * Group DLT645 tags by their potential wildcard prefix.
-     * <p>
-     * Two tags can be in the same group if they differ in exactly one DI byte position
-     * and their non-differing bytes are identical.
-     *
-     * @return list of groups, each group is a map of tagName → Dlt645Tag
+     * Group DLT645 tags by meter first, then by potential wildcard prefix.
+     * Tags for different meters must never share a wildcard frame.
      */
     private List<LinkedHashMap<String, Dlt645Tag>> groupByWildcardPrefix(
         LinkedHashMap<String, Dlt645Tag> tags) {
 
         if (tags.isEmpty()) return Collections.emptyList();
 
-        // Try all 4 positions, pick the one that produces the largest mergeable groups
+        var byMeter = new LinkedHashMap<String, LinkedHashMap<String, Dlt645Tag>>();
+        for (var entry : tags.entrySet()) {
+            String meter = entry.getValue().getMeterAddress();
+            String key = meter == null ? "" : meter;
+            byMeter.computeIfAbsent(key, k -> new LinkedHashMap<>())
+                .put(entry.getKey(), entry.getValue());
+        }
+
+        var groups = new ArrayList<LinkedHashMap<String, Dlt645Tag>>();
+        for (var partition : byMeter.values()) {
+            groups.addAll(groupOneMeter(partition));
+        }
+        return groups;
+    }
+
+    /**
+     * Two tags can be in the same group if they differ in exactly one DI byte position
+     * and their non-differing bytes are identical.
+     */
+    private List<LinkedHashMap<String, Dlt645Tag>> groupOneMeter(
+        LinkedHashMap<String, Dlt645Tag> tags) {
+
         var bestGroups = new ArrayList<LinkedHashMap<String, Dlt645Tag>>();
         var assigned = new HashSet<String>();
 
@@ -248,21 +267,22 @@ public class Dlt645BlockOptimizer {
             for (var entry : tags.entrySet()) {
                 if (assigned.contains(entry.getKey())) continue;
 
-                var diHex = entry.getValue().getAddressString().substring(0, 8).toUpperCase();
+                var diHex = entry.getValue().getDiHex();
                 var prefix = buildPrefixKey(diHex, pos);
                 groupsByPrefix.computeIfAbsent(prefix, k -> new LinkedHashMap<>())
                     .put(entry.getKey(), entry.getValue());
             }
 
-            // Extract groups with 2+ members and verify wildcard is valid
             for (var group : groupsByPrefix.values()) {
                 if (group.size() >= MIN_WILDCARD_GROUP_SIZE) {
                     var diList = new ArrayList<String>();
                     for (var t : group.values()) {
-                        diList.add(t.getAddressString().substring(0, 8).toUpperCase());
+                        diList.add(t.getDiHex());
                     }
                     var wildcardDi = DataIdentifiers.computeWildcardDi(diList);
-                    if (wildcardDi != null && !DataIdentifiers.getSubItems(wildcardDi).isEmpty()) {
+                    if (wildcardDi != null
+                        && DataIdentifiers.isOptimizerSafeBlockDi(wildcardDi)
+                        && !DataIdentifiers.getSubItems(wildcardDi).isEmpty()) {
                         bestGroups.add(group);
                         assigned.addAll(group.keySet());
                     }
@@ -270,7 +290,6 @@ public class Dlt645BlockOptimizer {
             }
         }
 
-        // Add remaining ungrouped tags as singleton groups
         for (var entry : tags.entrySet()) {
             if (!assigned.contains(entry.getKey())) {
                 var singleton = new LinkedHashMap<String, Dlt645Tag>();
@@ -308,13 +327,19 @@ public class Dlt645BlockOptimizer {
         var diList = new ArrayList<String>();
         var tagNames = new ArrayList<String>();
 
+        String meterAddress = null;
         for (var entry : group.entrySet()) {
             tagNames.add(entry.getKey());
-            diList.add(entry.getValue().getAddressString().substring(0, 8).toUpperCase());
+            diList.add(entry.getValue().getDiHex());
+            if (meterAddress == null) {
+                meterAddress = entry.getValue().getMeterAddress();
+            }
         }
 
         var wildcardDi = DataIdentifiers.computeWildcardDi(diList);
-        if (wildcardDi == null) return null;
+        if (wildcardDi == null || !DataIdentifiers.isOptimizerSafeBlockDi(wildcardDi)) {
+            return null;
+        }
 
         var subItems = DataIdentifiers.getSubItems(wildcardDi);
         if (subItems.isEmpty()) return null;
@@ -330,7 +355,7 @@ public class Dlt645BlockOptimizer {
                     tagName, diHex, wildcardDi);
                 return null;
             }
-            mappings.add(new SubTagMapping(tagName, index, diHex));
+            mappings.add(new SubTagMapping(tagName, index, diHex, group.get(tagName).getPlcValueType()));
         }
 
         // Parse wildcard DI bytes
@@ -341,7 +366,7 @@ public class Dlt645BlockOptimizer {
 
         // Use a synthetic tag name for the wildcard sub-request
         var wildcardTagName = "wc_" + wildcardDi;
-        var wildcardTag = new Dlt645WildcardTag(wildcardDiBytes, mappings);
+        var wildcardTag = new Dlt645WildcardTag(wildcardDiBytes, mappings, meterAddress);
 
         logger.debug("Merged {} tags into wildcard {}: {}", group.size(), wildcardDi, tagNames);
 

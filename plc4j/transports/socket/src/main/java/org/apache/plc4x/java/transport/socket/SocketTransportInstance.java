@@ -45,7 +45,7 @@ import java.util.function.Consumer;
  * {@link SocketChannel} (one device in DTU/gateway server mode).
  *
  * <p>This mirrors the official SPI3 {@code TcpTransportInstance} IO paradigm: one virtual
- * thread per connection doing blocking {@link SocketChannel} reads into a {@link RingBuffer},
+ * thread per channel doing blocking {@link SocketChannel} reads into a {@link RingBuffer},
  * with a registered data listener invoked on each read. Unlike the client-side TCP transport
  * it does not connect anywhere — the channel was accepted and handed in by the user (who also
  * performed any registration handshake and consumed the handshake bytes before injecting).</p>
@@ -57,6 +57,7 @@ public class SocketTransportInstance extends BaseTransportInstance<SocketTranspo
     private static final int DEFAULT_BUFFER_SIZE = 81920;
     private static final byte[] EMPTY_BYTES = new byte[0];
 
+    private final String deviceId;
     private final SocketChannel socketChannel;
     private final RingBuffer ringBuffer;
     private final ByteBuffer readBuffer;  // Reused per-connection direct buffer for channel reads (confined to the read thread)
@@ -69,11 +70,12 @@ public class SocketTransportInstance extends BaseTransportInstance<SocketTranspo
     private volatile Consumer<Throwable> disconnectListener;
     private final Thread readThread;
 
-    public SocketTransportInstance(SocketChannel socketChannel,
+    public SocketTransportInstance(String deviceId, SocketChannel socketChannel,
                                    SocketTransportConfiguration configuration,
                                    AuditLog auditLog) throws TransportException {
         super(configuration, auditLog);
-        LOGGER.debug("SocketTransportInstance");
+        LOGGER.debug("SocketTransportInstance deviceId={}", deviceId);
+        this.deviceId = deviceId;
         this.socketChannel = socketChannel;
         this.ringBuffer = new RingBuffer(configuration.receiveBufferSize > 0 ? configuration.receiveBufferSize : DEFAULT_BUFFER_SIZE);
         this.readBuffer = ByteBuffer.allocateDirect(DEFAULT_BUFFER_SIZE);
@@ -100,9 +102,9 @@ public class SocketTransportInstance extends BaseTransportInstance<SocketTranspo
         }
 
         getAuditLog().write(AuditLogEventType.CONNECT, String.format(
-            "Injected socket connection from: %s", getRemoteAddress()));
+            "Injected socket channel from: %s", getRemoteAddress()));
 
-        // Start the per-connection read loop on a virtual thread (Java 21+) LAST, so a throw
+        // Start the per-channel read loop on a virtual thread (Java 21+) LAST, so a throw
         // from the logging/audit above cannot leak an already-running thread.
         this.readThread = Thread.ofVirtual()
             .name("Socket-Read-" + getRemoteAddress())
@@ -246,12 +248,13 @@ public class SocketTransportInstance extends BaseTransportInstance<SocketTranspo
         // Acquiring writeLock first would deadlock against a writer parked in a blocking write().
         try {
             socketChannel.close();
-            LOGGER.debug("Socket connection closed");
+            LOGGER.debug("Socket channel closed");
             getAuditLog().write(AuditLogEventType.CLOSE, "Closed");
         } catch (IOException e) {
             getAuditLog().write(AuditLogEventType.ERROR, "Error in close: " + e.getMessage());
-            throw new TransportException("Failed to close connection", e);
+            throw new TransportException("Failed to close channel", e);
         } finally {
+            SocketTransport.removeChannel(deviceId);
             // Always join the read loop, regardless of whether the channel closed cleanly.
             // Skip the self-join when close() runs on the read thread itself.
             if (readThread != null && Thread.currentThread() != readThread) {
@@ -331,7 +334,7 @@ public class SocketTransportInstance extends BaseTransportInstance<SocketTranspo
     }
 
     /**
-     * Per-connection read loop on a virtual thread: blocking read into the ring buffer, then
+     * Per-channel read loop on a virtual thread: blocking read into the ring buffer, then
      * notify the data listener. No selector, no polling.
      */
     private void runReadLoop() {
@@ -353,10 +356,10 @@ public class SocketTransportInstance extends BaseTransportInstance<SocketTranspo
 
                 int bytesRead = socketChannel.read(readBuffer);  // parks vthread; releases carrier (JDK21)
                 if (bytesRead == -1) {
-                    // Connection closed gracefully by remote
-                    LOGGER.info("Connection closed by remote");
+                    LOGGER.info("Channel closed by remote deviceId={}", deviceId);
                     open.set(false);
                     notifyDisconnect(null);
+                    unregisterOnDisconnect();
                     break;
                 }
                 if (bytesRead == 0) {
@@ -383,9 +386,22 @@ public class SocketTransportInstance extends BaseTransportInstance<SocketTranspo
                 LOGGER.error("Error in read loop", e);
                 open.set(false);
                 notifyDisconnect(e);
+                unregisterOnDisconnect();
             }
         }
         LOGGER.debug("Read loop stopped");
+    }
+
+    /**
+     * Detach from the JVM-wide registry and close the socket. Safe to call from the read thread
+     * (does not {@code join} itself). Idempotent with {@link #close()}.
+     */
+    private void unregisterOnDisconnect() {
+        SocketTransport.removeChannel(deviceId);
+        try {
+            socketChannel.close();
+        } catch (IOException ignored) {
+        }
     }
 
 }
